@@ -1,0 +1,1564 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Paisley RFC 26/27 — Play Animator</title>
+<style>
+:root{
+  --ink:#0A1620; --panel:#10222E; --panel2:#16303E; --line:#1F4155;
+  --chalk:#E7F0F4; --muted:#84A0AE; --amber:#F5A524; --atk:#EAF7FF;
+  --atkring:#5FD3F3; --def:#8E2438; --defring:#E86B7F; --grass:#123528;
+}
+*{box-sizing:border-box}
+html,body{margin:0;background:var(--ink);color:var(--chalk);
+  font-family:ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+  -webkit-text-size-adjust:100%}
+body{padding-bottom:48px}
+header{display:flex;gap:12px;align-items:center;padding:14px 16px 10px}
+.crest{width:38px;height:38px;flex:0 0 38px;border:2px solid var(--amber);border-radius:50%;
+  display:grid;place-items:center;font-size:11px;font-weight:800;letter-spacing:.04em;color:var(--amber)}
+h1{font-size:19px;margin:0;font-weight:800;letter-spacing:.14em;text-transform:uppercase}
+h1 span{color:var(--amber)}
+.sub{margin:2px 0 0;font-size:11.5px;color:var(--muted);letter-spacing:.06em}
+nav,.chips{display:flex;gap:7px;overflow-x:auto;padding:6px 16px 10px;scrollbar-width:none}
+nav::-webkit-scrollbar,.chips::-webkit-scrollbar{display:none}
+nav button{flex:0 0 auto;background:none;border:1px solid var(--line);color:var(--muted);
+  padding:7px 12px;border-radius:999px;font-size:11px;font-weight:700;letter-spacing:.09em;
+  text-transform:uppercase;cursor:pointer;font-family:inherit}
+nav button[aria-selected=true]{background:var(--amber);border-color:var(--amber);color:#0A1620}
+.chips button{flex:0 0 auto;background:var(--panel);border:1px solid var(--line);color:var(--chalk);
+  padding:9px 13px;border-radius:8px;font-size:12.5px;font-weight:700;letter-spacing:.05em;
+  cursor:pointer;font-family:inherit;white-space:nowrap}
+.chips button[aria-selected=true]{border-color:var(--amber);box-shadow:inset 0 0 0 1px var(--amber)}
+main{padding:0 16px}
+.board{background:var(--panel);border:1px solid var(--line);border-radius:14px;overflow:hidden}
+svg.pitch{display:block;width:100%;height:auto;background:var(--grass)}
+.transport{display:flex;align-items:center;gap:10px;padding:10px 12px;background:var(--panel);
+  border:1px solid var(--line);border-top:none;border-radius:0 0 14px 14px;margin-top:-14px;padding-top:22px}
+.transport button{background:var(--panel2);border:1px solid var(--line);color:var(--chalk);
+  width:38px;height:38px;border-radius:9px;font-size:14px;cursor:pointer;flex:0 0 auto;font-family:inherit}
+.transport button.main{background:var(--amber);border-color:var(--amber);color:#0A1620;font-weight:800}
+input[type=range]{flex:1;accent-color:var(--amber);min-width:40px}
+.spd{font-size:11px;font-weight:800;letter-spacing:.06em;width:auto;padding:0 8px!important}
+h2{font-size:17px;margin:16px 0 4px;letter-spacing:.1em;text-transform:uppercase;font-weight:800}
+h2 em{font-style:normal;color:var(--amber)}
+.blurb{margin:0 0 12px;font-size:13.5px;line-height:1.55;color:var(--muted)}
+ol.steps{list-style:none;margin:0;padding:0;counter-reset:s}
+ol.steps li{counter-increment:s;display:flex;gap:10px;padding:9px 11px;border-left:2px solid var(--line);
+  font-size:13px;line-height:1.5;color:var(--muted);cursor:pointer}
+ol.steps li:before{content:counter(s);font-size:10px;font-weight:800;color:var(--line);
+  min-width:14px;padding-top:2px}
+ol.steps li.on{color:var(--chalk);border-left-color:var(--amber);background:var(--panel)}
+ol.steps li.on:before{color:var(--amber)}
+.callout{margin:14px 0 0;padding:11px 13px;border:1px dashed var(--amber);border-radius:10px;
+  font-size:12.5px;line-height:1.55;color:var(--amber)}
+.legend{display:flex;flex-wrap:wrap;gap:12px;margin:12px 0 0;font-size:11px;color:var(--muted)}
+.legend i{display:inline-block;width:11px;height:11px;border-radius:50%;margin-right:5px;
+  vertical-align:-1px}
+.info{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:16px;
+  font-size:13.5px;line-height:1.6}
+.info h3{margin:18px 0 6px;font-size:12px;letter-spacing:.12em;text-transform:uppercase;color:var(--amber)}
+.info h3:first-child{margin-top:0}
+.info p{margin:0 0 10px;color:#C9DAE3}
+.info ul{margin:0 0 10px;padding-left:18px;color:#C9DAE3}
+.info li{margin-bottom:6px}
+.info code{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;background:var(--panel2);
+  padding:1px 5px;border-radius:4px;font-size:12px;color:var(--amber)}
+.info b{color:#fff}
+.zones{width:100%;height:auto;display:block;margin:0 0 14px;border-radius:10px}
+footer{padding:26px 16px 0;font-size:11px;color:var(--muted);line-height:1.6}
+@media (min-width:820px){main{max-width:820px;margin:0 auto}header,nav,.chips{max-width:820px;margin:0 auto}}
+</style>
+</head>
+<body>
+<header>
+  <div class="crest">PRFC</div>
+  <div>
+    <h1>Playbook 26<span>/</span>27</h1>
+    <p class="sub">Pick a call — run it, think on your feet, play to the whistle</p>
+  </div>
+</header>
+<nav id="cats" aria-label="Sections"></nav>
+<div class="chips" id="plays" aria-label="Plays"></div>
+<main>
+  <div id="stage"></div>
+  <h2 id="pname"></h2>
+  <p class="blurb" id="pblurb"></p>
+  <ol class="steps" id="steps"></ol>
+  <div id="pnote"></div>
+  <div class="legend" id="legend"></div>
+</main>
+<footer>Positions are drawn to make the shape clear, not to scale. Where the written playbook could be read two ways, that's flagged in amber — check it with the coach before you drill it.</footer>
+
+<script>
+/* ---------- geometry ---------- */
+const W=70, D=46, PX=10;
+const sx=x=>x*PX, sy=y=>(D-y)*PX;
+const NS='http://www.w3.org/2000/svg';
+const el=(n,a={})=>{const e=document.createElementNS(NS,n);for(const k in a)e.setAttribute(k,a[k]);return e;};
+
+/* ---------- roster helpers ---------- */
+const A=(id,x,y,label)=>({id,label:label||id,team:'atk',x,y});
+const Df=(id,x,y,label)=>({id,label:label||'D',team:'def',x,y});
+const RUCK=(x,y)=>({id:'ruck',label:'',team:'ruck',x,y});
+const SCRUM=(x,y)=>({id:'scrum',label:'',team:'scrum',x,y});
+/* Two full packs bound at the scrum. Our 8 is at the base; anyone in the pack who has a
+   job in the move breaks from it, the rest stay bound. */
+const PACK=(x,y)=>{
+  const P=[{id:'scrumring',label:'',team:'ring',x,y:y+.65}];
+  const add=(id,dx,dy,team,lbl)=>P.push({id,label:lbl||id,team,x:x+dx,y:y+dy,bound:true,small:true});
+  add('1',-1.5,0,'atk');add('2',0,0,'atk');add('3',1.5,0,'atk');
+  add('4',-.75,-1.35,'atk');add('5',.75,-1.35,'atk');
+  add('6',-2.25,-1.2,'atk');add('7',2.25,-1.2,'atk');
+  add('8',0,-2.6,'atk');
+  add('o1',1.5,1.3,'def','1');add('o2',0,1.3,'def','2');add('o3',-1.5,1.3,'def','3');
+  add('o4',.75,2.65,'def','4');add('o5',-.75,2.65,'def','5');
+  add('o6',2.25,2.5,'def','6');add('o7',-2.25,2.5,'def','7');add('o8',0,3.9,'def','8');
+  return P;
+};
+
+const FWD=()=>[RUCK(20,14),A('9',23,12.8),A('F1',27,12.4),A('F2',32,12.4),A('F4',27.5,9.4),
+  A('F3',32.5,9.4),A('10',46,8),
+  Df('d1',21.5,17.5),Df('d2',29,17.5),Df('d3',35,17.5),Df('d4',41,17.5),Df('d5',47,17.5),Df('d6',54,17.5)];
+
+const BACKS=()=>[RUCK(16,14),A('9',19,13),A('10',28,10),A('12',37,8.5),A('13',46,8),
+  A('15',52,2.5),A('14',61,7),A('11',9,6),
+  Df('d1',20,17.5),Df('d2',28,17.5),Df('d3',36,17.5),Df('d4',44,17.5),Df('d5',52,17.5),Df('d6',60,17.5)];
+
+const TAR=()=>[RUCK(14,13),A('9',17,12),A('10',26,10),A('12',38,9),A('13',48,8),
+  A('15',44,2.5),A('14',60,7),A('11',20,3),
+  Df('od1',20,17,'D'),Df('od2',25,17,'D'),Df('o10',31,17,'10'),Df('o12',41,17,'12'),
+  Df('o13',51,17,'13'),Df('o14',61,16,'14'),Df('o15',53,27,'15')];
+
+const LOX=[9,11.5,14,16.5,19,21.5,24];
+const LINEOUT=(toks)=>{
+  const p=[{id:'H',label:'H',team:'atk',x:4,y:13.6},A('9',17,10.5)];
+  toks.forEach((tk,i)=>{const t=String(tk);p.push(A(t.replace(/\D/g,''),LOX[i],13.6,t));});
+  toks.forEach((tk,i)=>p.push(Df('op'+i,LOX[i],15.6,'')));
+  return p;
+};
+
+/* ---------- play data ---------- */
+const PLAYS=[
+
+/* ============ GAME PLAN ============ */
+{cat:'Game plan',id:'zones',name:'Attack zones',type:'info',blurb:'Where you are on the park decides what you do next.',
+ html:`<svg class="zones" viewBox="0 0 700 200">
+  <rect x="0" y="0" width="230" height="200" fill="#4A1520"/>
+  <rect x="230" y="0" width="230" height="200" fill="#5A3C0C"/>
+  <rect x="460" y="0" width="240" height="200" fill="#14382A"/>
+  <g stroke="rgba(255,255,255,.25)" stroke-width="2">
+    <line x1="230" y1="0" x2="230" y2="200"/><line x1="460" y1="0" x2="460" y2="200"/>
+    <line x1="2" y1="0" x2="2" y2="200" stroke-width="4"/><line x1="698" y1="0" x2="698" y2="200" stroke-width="4"/>
+  </g>
+  <g fill="#fff" font-family="ui-sans-serif,system-ui" font-weight="800" font-size="22" letter-spacing="3">
+    <text x="70" y="95">RED</text><text x="292" y="95">AMBER</text><text x="530" y="95">GREEN</text>
+  </g>
+  <g fill="rgba(255,255,255,.7)" font-family="ui-sans-serif,system-ui" font-size="13">
+    <text x="70" y="120">our 22</text><text x="292" y="120">22 to their 10m</text><text x="530" y="120">their half</text>
+  </g>
+  <g fill="var(--amber)" font-family="ui-sans-serif,system-ui" font-size="13" font-weight="700">
+    <text x="640" y="180">→ attack</text>
+  </g>
+ </svg>
+ <h3>Red — inside our own 22</h3>
+ <p><b>Phase 1:</b> long kick (10 or 15). Forward play, <b>Chaos</b> move to get the angle on the kick. The kick must find touch. Nothing else happens in red — get out.</p>
+ <h3>Amber — our 22 to their 10m</h3>
+ <ul><li><b>1.</b> Off lineout or scrum, Pod 1 attacks midfield with 12/13.</li>
+ <li><b>2.</b> Four forwards round the corner. 10 decides if it comes off 9 or off 10.</li>
+ <li><b>3.</b> Ball to 10 — look for space, gaps, mismatches (backs on forwards). Hands or kick, but a kick must go to space and touch grass.</li>
+ <li><b>4.</b> Play each phase as it comes: forwards then backs. Heads-up rugby.</li>
+ <li><b>5.</b> 10 decides — keep going the same way or come back the way the ball came. We keep the ball until we're over the line.</li></ul>
+ <h3>Green — their half</h3>
+ <ul><li><b>1.</b> Pod 1 attacks midfield.</li>
+ <li><b>2.</b> Four forwards round the corner (10 calls off 9 or off 10).</li>
+ <li><b>3.</b> Attack wide to the 15m channel. Option 1: keep the ball alive — <b>arrowheads</b>. Option 2: if contact is made, quick ruck and get it back in play.</li>
+ <li><b>4.</b> Next four forwards hit up — <b>lions</b>.</li>
+ <li><b>5.</b> Heads-up rugby, same as amber.</li></ul>
+ <h3>Arrowheads</h3>
+ <p>When the ball carrier breaks, support angles in behind him in an arrowhead. He then has a man on both sides — either to take the pass, or to hit the tackle/ruck.</p>
+ <h3>Plan B / Plan C</h3>
+ <p><b>Plan B:</b> back to phase two and rebuild the phases.<br>
+ <b>Plan C:</b> kick to the corners, ball out of play. Then squeeze them retrieving it. Always put pressure on every opposition restart — it stops them building phases and cuts down their options.</p>
+ <h3>Called but never described</h3>
+ <p>Two things are named in the playbook without being explained anywhere in it, so they aren't drawn here: <b>LION / LIONS</b> (green zone phase 4, and the next phase off a received kick-off) and the second tryline line-out code <b>H: 1 356 748</b>, which is listed with nothing after it. Worth getting both off the coach.</p>
+ <h3>The aim</h3>
+ <p>Get into their half and take every point on offer first. Build a lead, keep the scoreboard ticking. Once we're ahead, then we go hunting the bonus-point tries.</p>`},
+
+{cat:'Game plan',id:'arrowheads',name:'ARROWHEADS',blurb:'What support does the moment somebody breaks the line.',
+ players:[A('12',30,13),A('10',20,10),A('13',42,10),A('15',33,4),
+  Df('b1',26,16,''),Df('b2',36,16,''),Df('c1',30,25,'')],
+ ballStart:'12',staticDef:true,actions:[
+  {t:0,d:2,type:'run',who:'12',dx:0,dy:9,note:'The carrier breaks the line.'},
+  {t:.3,d:2,type:'run',who:'10',dx:7,dy:9.5,note:'Support angles IN behind him, not straight up the pitch.'},
+  {t:.3,d:2,type:'run',who:'13',dx:-9,dy:9.5,note:'That gives him a man on both sides — the arrowhead.'},
+  {t:.5,d:2,type:'run',who:'15',dx:-1,dy:12,note:'Third man fills the point behind.'},
+  {t:1.6,d:1.4,type:'run',who:'c1',dx:-2.5,dy:-4,note:'Their cover arrives.'},
+  {t:2.3,d:.5,type:'pass',from:'12',to:'13',note:'Now he has a choice: take the pass on either side, or support him into the tackle and ruck.'},
+  {t:2.8,d:1.3,type:'run',who:'13',dx:2,dy:5}]},
+
+{cat:'Game plan',id:'abcd',name:'ABCD at the ruck',type:'info',blurb:'What the next four arrivals do on our own ball.',
+ html:`<h3>A — Aggressor</h3><p>Assist the ball carrier with strong leg drive. Clear the tackler back beyond the ball.</p>
+ <h3>B — Ball carrier</h3><p>Work hard to get to ground, then present the ball cleanly.</p>
+ <h3>C — Clear out</h3><p>Help the aggressor by clearing defenders beyond the ball — or become the clearer-passer.</p>
+ <h3>D — Decision</h3><p>Decide: clear out what's left, protect the space, or become the clearer-passer.</p>`},
+
+{cat:'Game plan',id:'kickcalls',name:'Kick calls & comms',type:'info',blurb:'Backs kick calls and the shout to the forwards.',
+ html:`<h3>Kick calls</h3>
+ <ul><li><code>APPLE</code> box kick</li><li><code>PEAR</code> grubber</li><li><code>ORANGE</code> kick to the corner</li></ul>
+ <h3>Backs to forwards</h3>
+ <p>Tell the forwards where the strike move is going on the next phase, so they set the platform in the right place.</p>
+ <ul><li><code>C</code> close</li><li><code>M</code> middle</li><li><code>S</code> spread</li></ul>
+ <h3>Non-negotiable</h3><p>Every play is run <b>on the gain line</b>. Deep and flat-footed asks the defence nothing.</p>`},
+
+/* ============ FORWARDS ============ */
+{cat:'Forwards',id:'punch',name:'PUNCH',blurb:'The default round-the-corner carry. 9 to F1, short ball to F2 on the angle.',
+ players:FWD(),ballStart:'9',actions:[
+  {t:0,d:.45,type:'pass',from:'9',to:'F1',note:'9 passes to F1.'},
+  {t:.45,d:1.1,type:'run',who:'F1',dx:.5,dy:3.6,note:'F1 takes it forward, square onto the line.'},
+  {t:.5,d:1.1,type:'run',who:'F2',dx:-2.2,dy:3.2,note:'F2 starts level with F1 and runs a hard angle back inside him — that angle is the punch.'},
+  {t:1.6,d:.35,type:'pass',from:'F1',to:'F2',note:'F1 moves forward and pops to F2 on the angle.'},
+  {t:1.95,d:1.2,type:'run',who:'F2',dx:-.6,dy:3.8,note:'F2 hits the seam between the two defenders F1 has fixed.'}],
+ check:'The game plan says 10 decides whether the round-the-corner comes off 9 or off 10. Every forwards move here is drawn off 9.'},
+{cat:'Forwards',id:'jab',name:'JAB',blurb:'Punch with the ball held one man longer — F2 gets nothing and that is the point.',
+ players:FWD(),ballStart:'9',actions:[
+  {t:0,d:.45,type:'pass',from:'9',to:'F1',note:'9 passes to F1.'},
+  {t:.45,d:1,type:'run',who:'F1',dx:.4,dy:3.2,note:'F1 carries onto the line.'},
+  {t:.5,d:1.1,type:'run',decoy:true,who:'F2',dx:-2,dy:3.2,note:'F2 still runs the punch line. He gets no ball — his job is to drag two defenders together.'},
+  {t:.6,d:1.2,type:'run',who:'F3',dx:1,dy:2.6,note:'F3 comes up out of the back rank, already angling out behind F2.'},
+  {t:1.65,d:.5,type:'pass',miss:true,from:'F1',to:'F3',note:'F1 passes behind F2 to F3.'},
+  {t:2.15,d:1.3,type:'run',who:'F3',dx:2.8,dy:4.2,note:'F3 drifts OUT — F2 has dragged the defence in, so that is where the space is now.'}]},
+{cat:'Forwards',id:'escape',name:'ESCAPE',blurb:'Get the ball back out to 10 with the forwards used as decoys.',
+ players:FWD().map(p=>p.id==='10'?{...p,x:41,y:8.5}:p),ballStart:'9',actions:[
+  {t:0,d:.45,type:'pass',from:'9',to:'F1',note:'9 passes to F1.'},
+  {t:.45,d:.8,type:'run',who:'F1',dx:.3,dy:2,note:'F1 steps up, holding the defenders in front of him.'},
+  {t:.5,d:1.1,type:'run',decoy:true,who:'F2',dx:-2,dy:3.2,note:'Every forward still runs his line — all decoys.'},
+  {t:.5,d:1.1,type:'run',decoy:true,who:'F4',dx:1.5,dy:3.5},
+  {t:.5,d:1.1,type:'run',decoy:true,who:'F3',dx:-1,dy:3.2},
+  {t:.05,d:1.6,type:'run',who:'9',dx:3,dy:1,slow:true,note:'9 works round for the return.'},
+  {t:1.3,d:.35,type:'pass',from:'F1',to:'9',note:'F1 gives it straight back to 9.'},
+  {t:1.65,d:.55,type:'pass',from:'9',to:'10',note:'9 fires it to 10 for the outside options.'},
+  {t:2.25,d:1.3,type:'run',who:'10',dx:2,dy:2.5,note:'10 attacks — or kicks to the corners.'}]},
+
+{cat:'Forwards',id:'escapepocket',name:'ESCAPE (pocket)',blurb:'The second version in the playbook — F1 misses 9 and finds 10 sitting in the pocket.',
+ players:FWD(),ballStart:'9',actions:[
+  {t:0,d:.45,type:'pass',from:'9',to:'F1',note:'9 passes to F1.'},
+  {t:0,d:1.3,type:'run',who:'10',dx:-9,dy:1.6,note:'10 drops into the pocket behind the set-up rather than sitting out wide.'},
+  {t:.45,d:.8,type:'run',who:'F1',dx:.3,dy:2,note:'F1 steps up and holds his defenders.'},
+  {t:.5,d:1.1,type:'run',decoy:true,who:'F2',dx:-2,dy:3.2,note:'All four forwards still run their lines as decoys.'},
+  {t:.5,d:1.1,type:'run',decoy:true,who:'F4',dx:1.5,dy:3.5},
+  {t:.5,d:1.1,type:'run',decoy:true,who:'F3',dx:-1,dy:3.2},
+  {t:1.3,d:.6,type:'pass',miss:true,from:'F1',to:'10',note:'F1 passes straight to 10 — 9 is cut out completely.'},
+  {t:2,d:1.3,type:'run',who:'10',dx:4,dy:3,note:'Same two options: kick the corners, or keep it alive in hand.'}]},
+{cat:'Forwards',id:'reload',name:'RELOAD',blurb:'Skip the front two. F4 loads up and commits the third defender, F3 loops out into the space.',
+ players:FWD(),ballStart:'9',actions:[
+  {t:0,d:.45,type:'pass',from:'9',to:'F1',note:'9 passes to F1.'},
+  {t:.45,d:1,type:'run',who:'F1',dx:-.3,dy:3,note:'F1 carries up and holds the first two defenders.'},
+  {t:.5,d:1.1,type:'run',decoy:true,who:'F2',dx:-2,dy:3.2,note:'F2 runs his punch line as the decoy.'},
+  {t:.55,d:1.2,type:'run',who:'F4',dx:3.5,dy:2.6,note:'F4 reloads onto the ball out of the back rank, behind F2.'},
+  {t:1.6,d:.5,type:'pass',miss:true,from:'F1',to:'F4',note:'F1 passes to F4.'},
+  {t:2.1,d:1.1,type:'run',who:'F4',dx:3,dy:3.2,note:'F4 runs straight at the THIRD defender and commits him.'},
+  {t:.9,d:1.3,type:'run',who:'F3',dx:5,dy:-.6,note:'F3 loops round the outside of F4.'},
+  {t:2.2,d:1.1,type:'run',who:'F3',dx:3,dy:3.6,note:'...and straightens into the space F4 has opened.'},
+  {t:3.1,d:.45,type:'pass',from:'F4',to:'F3',note:'Tip-on to F3 in the hole.'}]},
+{cat:'Forwards',id:'tencall',name:'10 (forwards)',blurb:'A pass back inside F1. Only called when the space is actually there.',
+ players:FWD(),ballStart:'9',actions:[
+  {t:0,d:.45,type:'pass',from:'9',to:'F1',note:'9 passes to F1.'},
+  {t:.45,d:1,type:'run',who:'F1',dx:.5,dy:3.2,note:'F1 carries and takes the defenders with him.'},
+  {t:.5,d:1.2,type:'run',who:'F4',dx:-2,dy:2.6,note:'F4 comes out of the back rank and swings back inside F1, into the hole.'},
+  {t:1.6,d:.4,type:'pass',from:'F1',to:'F4',note:'F1 pops back inside.'},
+  {t:2,d:1.2,type:'run',who:'F4',dx:-1,dy:3.6,note:'Straight through the gap.'}],
+ check:'The playbook just says "a pass back inside F1". Worth pinning down with the coach exactly who runs that inside line — the back-rank forward, or 9.'},
+{cat:'Forwards',id:'chaos',name:'CHAOS',blurb:'Slow ball. Pick and go twice, clear each ruck, then get it wide fast — all eight forwards in it.',
+ players:[{...RUCK(20,14),r:21},
+  {id:'F7',label:'F7',team:'atk',x:19.1,y:14.4,bound:true,small:true},{id:'F8',label:'F8',team:'atk',x:21,y:13.7,bound:true,small:true},
+  A('9',23,12.8),A('F1',26,12.6),A('F2',25,10.4),A('F3',33,9.6),A('F4',29.5,9.6),A('F5',24.5,8.8),A('F6',27.5,7.4),A('10',46,8),
+  Df('d1',22,17.5),Df('d2',28,17.5),Df('d3',34,17.5),Df('d4',40,17.5),Df('d5',46,17.5),Df('d6',53,17.5)],
+ ballStart:'F1',lineSpeed:1.8,actions:[
+  {t:0,d:1,type:'run',who:'F1',dx:1,dy:3.2,hold:true,note:'Ball is slow — F1 picks and goes.'},
+  {t:.8,d:.8,type:'run',who:'F2',dx:1.5,dy:3,note:'F2 is stacked in behind him and follows in.'},
+  {t:.9,d:.6,type:'mark',x:27,y:17.2,label:'2'},
+  {t:.7,d:1.1,type:'run',who:'F5',dx:2.5,dy:8.8,hold:true,note:'F5 is straight in over F1 to clear out ruck 2 — that is what makes the next pick quick.'},
+  {t:1.4,d:1.1,type:'run',who:'9',dx:5.5,dy:.4,note:'9 becomes the clearer-passer — but the ball has to be presented quickly.'},
+  {t:1.6,d:.3,type:'pass',from:'F1',to:'F2',note:'F2 picks and goes off the next one.'},
+  {t:1.9,d:1,type:'run',who:'F2',dx:1.5,dy:3.4,hold:true},
+  {t:2.7,d:.6,type:'mark',x:28,y:18.4,label:'3'},
+  {t:2.2,d:1.2,type:'run',who:'F4',dx:-1.3,dy:8.2,hold:true,note:'F4 arrives and CLEARS OUT ruck 3 — drives through and beyond the ball.'},
+  {t:2.4,d:1.3,type:'run',who:'F3',dx:4,dy:3.8,note:'F3 hits up WIDER off ruck 3 — hard and fast, that is difficult to defend.'},
+  {t:2.5,d:1.3,type:'run',who:'F6',dx:7.5,dy:4.4,note:'F6 goes with him — two in the channel, so the carry is never isolated.'},
+  {t:2.6,d:.8,type:'run',who:'9',dx:1,dy:1.6},
+  {t:2.9,d:.3,type:'pass',from:'F2',to:'9',note:'Ball back to 9 at the ruck.'},
+  {t:3.3,d:.5,type:'pass',from:'9',to:'F3',note:'9 sends it to F3.'},
+  {t:3.7,d:1,type:'run',who:'F3',dx:1,dy:2.5},
+  {t:4.2,d:.8,type:'run',who:'9',dx:9,dy:-1.7,note:'9 follows the ball and gets in behind the next ruck.'},
+  {t:4.8,d:.3,type:'pass',from:'F3',to:'9'},
+  {t:5,d:.9,type:'run',who:'10',dx:1,dy:2.8},
+  {t:5.2,d:.6,type:'pass',from:'9',to:'10',note:'Minimum two hit-ups, then it goes open or blind — out to 10 so the backs get fast ball to run onto.'}]},
+{cat:'Forwards',id:'ronnie',name:'RONNIE BALL',blurb:'Tryline finisher. Only on when the defence has been sucked in to the rucks — then F3 scores on the blind.',
+ players:[RUCK(30,17),A('9',32,16.6),A('F1',35.5,16),A('F2',30.5,14),A('F3',26,16),
+  Df('d1',22.5,19),Df('d2',26.5,19),Df('d3',31,19),Df('d4',36,19),Df('d5',41,19)],
+ ballStart:'9',tryline:21,staticDef:true,actions:[
+  {t:0,d:.9,type:'run',who:'d1',dx:4.5,dy:-.3,note:'We have picked and gone the same way a couple of times. Watch their blindside guard — he is getting sucked in to the ruck. That is the trigger.'},
+  {t:0,d:.9,type:'run',who:'d2',dx:2.5,dy:-.3},
+  {t:0,d:.7,type:'run',decoy:true,who:'F1',dx:1,dy:1.4,note:'F1 is on the open side with F2 behind, set to pick and go again.'},
+  {t:0,d:.7,type:'run',decoy:true,who:'F2',dx:1.5,dy:1},
+  {t:.3,d:.4,type:'dummy',from:'9',to:'F1',note:'9 shapes to give it to F1 one more time.'},
+  {t:.8,d:.5,type:'pass',from:'9',to:'F3',note:'It goes blind instead — to F3, who has been standing out of the play.'},
+  {t:1.35,d:1.2,type:'run',who:'F3',dx:-1.5,dy:5.5,note:'Hips already turned, so he slides over the line where the guard used to be.'}],
+ check:'"9 passes to first forward F1, but then passes to the blind forward F3" can be read as a dummy from 9 (shown here) or a genuine pass to F1 who then feeds F3. Confirm which.'},
+{cat:'Back row',id:'yellow',name:'YELLOW',blurb:'Scrum on the right. 8 and 9 build a 2 v 1 for the winger.',
+ players:[...PACK(48,14),A('9',52,11.6),A('11',61,10),A('10',38,9),
+  Df('o9',52.5,17.8,'9'),Df('ow',58,17,'14')],
+ ballStart:'8',actions:[
+  {t:0,d:.5,type:'run',who:'8',dx:0,dy:1,note:'8 picks up at the base of the scrum.'},
+  {t:.4,d:.4,type:'pass',from:'8',to:'9',note:'8 passes early to 9 — early is the whole move.'},
+  {t:.8,d:1.3,type:'run',who:'9',dx:3,dy:4,note:'9 takes it on and runs AT the last defender to pull him in.'},
+  {t:1,d:1.4,type:'run',who:'11',dx:-1.5,dy:4.5,note:'11 comes off his wing in support — now it is 2 v 1.'},
+  {t:.9,d:1.3,type:'run',who:'7',dx:1.5,dy:3.5,note:'7 and 8 break and track inside him as short options if the defence folds in.'},
+  {t:.9,d:1.3,type:'run',who:'8',dx:2.5,dy:3},
+  {t:2.1,d:.5,type:'pass',from:'9',to:'11',note:'Draw and give.'},
+  {t:2.6,d:1.3,type:'run',who:'11',dx:1,dy:4.5,note:'11 in behind.'}]},
+{cat:'Back row',id:'black1',name:'BLACK 1',blurb:'Scrum on the left. Blindside winger comes in behind 9.',
+ players:[...PACK(20,14),A('9',24,12),A('14',9,10),A('10',30,9),A('12',38,8),
+  Df('d1',13,17),Df('o9',25.5,17.8,'9'),Df('d3',32,17),Df('d4',40,17)],
+ ballStart:'8',actions:[
+  {t:0,d:.5,type:'run',who:'8',dx:0,dy:1,note:'8 picks at the base.'},
+  {t:.4,d:.4,type:'pass',from:'8',to:'9',note:'8 passes to 9.'},
+  {t:.8,d:.9,type:'run',who:'9',dx:3,dy:1,note:'9 drifts slightly away from the scrum.'},
+  {t:.9,d:1.3,type:'run',who:'14',dx:8.5,dy:2.4,note:'Blindside winger runs in behind 9.'},
+  {t:1.8,d:.45,type:'pass',from:'9',to:'14',note:'9 passes behind himself to the winger.'},
+  {t:2.25,d:1.4,type:'run',who:'14',dx:3,dy:4.5,note:'He keeps it alive, or takes contact beyond the gain line. If a ruck forms it sucks their key men in — that gives us the outside edge, so the ball must be played quickly.'}]},
+{cat:'Back row',id:'black2',name:'BLACK 2',blurb:'Same picture as Black 1, but the winger gets a dummy and 12 gets the ball.',
+ players:[...PACK(20,14),A('9',24,12),A('14',9,10),A('10',30,9),A('12',38,8),
+  Df('d1',13,17),Df('o9',25.5,17.8,'9'),Df('d3',32,17),Df('d4',40,17)],
+ ballStart:'8',actions:[
+  {t:0,d:.5,type:'run',who:'8',dx:0,dy:1,note:'8 picks and passes to 9.'},
+  {t:.4,d:.4,type:'pass',from:'8',to:'9'},
+  {t:.8,d:.9,type:'run',who:'9',dx:3,dy:1,note:'9 drifts away from the scrum.'},
+  {t:.9,d:1.3,type:'run',decoy:true,who:'14',dx:8.5,dy:2.4,note:'Blindside winger runs the same line as Black 1.'},
+  {t:1.2,d:1.4,type:'run',who:'12',dx:-5,dy:4.2,note:'12 times an in-line run back towards the scrum.'},
+  {t:1.8,d:.4,type:'dummy',from:'9',to:'14',note:'9 dummies to the winger.'},
+  {t:2.2,d:.5,type:'pass',from:'9',to:'12',note:'Ball goes to 12 on the in-line.'},
+  {t:2.7,d:1.3,type:'run',who:'12',dx:-1,dy:3.6,note:'12 carries. If a ruck forms we want their key men sucked in — that puts us on the front foot.'}],
+ check:'After either Black move the next phase is the first four forwards round the corner off 9 — usually a PUNCH, if it comes quick enough.'},
+/* ============ BACKS ============ */
+{cat:'Backs',id:'polo',name:'POLO',blurb:'Straight hands. No shape, just move the ball and make them drift.',
+ players:BACKS(),ballStart:'9',actions:[
+  {t:0,d:.4,type:'pass',from:'9',to:'10',note:'9 to 10.'},
+  {t:.2,d:1,type:'run',who:'10',dx:1,dy:2.5,note:'Everyone runs straight — nobody drifts.'},
+  {t:.6,d:.4,type:'pass',from:'10',to:'12',note:'10 to 12.'},
+  {t:.5,d:1,type:'run',who:'12',dx:1,dy:2.5},
+  {t:1.1,d:.4,type:'pass',from:'12',to:'13',note:'12 to 13.'},
+  {t:.9,d:1,type:'run',who:'13',dx:1,dy:2.5},
+  {t:1.6,d:.45,type:'pass',from:'13',to:'14',note:'13 to 14 — hands only.'},
+  {t:1.4,d:1.3,type:'run',who:'14',dx:1,dy:3},
+  {t:2.2,d:1.2,type:'run',who:'14',dx:1,dy:4}]},
+
+{cat:'Backs',id:'munster',name:'MUNSTER',blurb:'10 cuts with 12, then hits 12 or 13 on the angle.',
+ players:BACKS(),ballStart:'9',actions:[
+  {t:0,d:.4,type:'pass',from:'9',to:'10',note:'9 to 10.'},
+  {t:.3,d:1.1,type:'run',who:'10',dx:4,dy:3.2,note:'10 takes it flat and runs across at 12.'},
+  {t:.5,d:1.1,type:'run',who:'12',dx:-4,dy:3.2,note:'12 cuts back underneath him — that crossing is the cut.'},
+  {t:1.5,d:1.2,type:'run',who:'13',dx:-3.5,dy:3.2,note:'13 comes back on the angle behind the cut.'},
+  {t:1.9,d:.5,type:'pass',from:'10',to:'13',note:'10 carries through the cut and hits 13 on the angle. He can hit 12 on the cut instead — call it early.'},
+  {t:2.4,d:1.3,type:'run',who:'13',dx:2,dy:4}]},
+
+{cat:'Backs',id:'spencer',name:'SPENCER',blurb:'Loop and release. 10 goes round 12, gets it back, and puts 15 through wide.',
+ players:BACKS(),ballStart:'9',actions:[
+  {t:0,d:.4,type:'pass',from:'9',to:'10',note:'9 to 10.'},
+  {t:.3,d:.8,type:'run',who:'10',dx:3,dy:1.5},
+  {t:.6,d:.35,type:'pass',from:'10',to:'12',note:'10 pops to 12.'},
+  {t:1.15,d:1.4,type:'run',who:'10',dx:9,dy:-3,note:'10 loops round the back of 12.'},
+  {t:.7,d:1.2,type:'run',who:'12',dx:1,dy:2,note:'12 holds the ball square.'},
+  {t:.8,d:1.2,type:'run',decoy:true,who:'13',dx:-3,dy:3,note:'13 fakes a crash ball outside 12.'},
+  {t:2.1,d:.4,type:'pass',from:'12',to:'10',note:'As 13 arrives, 12 pops it back to the looping 10.'},
+  {t:2.4,d:1.2,type:'run',who:'10',dx:4,dy:2.5},
+  {t:2.3,d:1.4,type:'run',who:'15',dx:2,dy:7,note:'15 hits a wide, hard line.'},
+  {t:3.2,d:.5,type:'pass',from:'10',to:'15',note:'10 hits 15.'},
+  {t:3.7,d:1.3,type:'run',who:'15',dx:3,dy:4,note:'Keep the ball alive down the channel — 10 supports.'},
+  {t:3.7,d:1.3,type:'run',who:'10',dx:3,dy:3}]},
+
+{cat:'Backs',id:'strike',name:'STRIKE',blurb:'Dummy to 12, ball to 11 arriving behind him.',
+ players:BACKS().map(p=>p.id==='11'?{...p,x:14,y:4.5}:p),ballStart:'9',actions:[
+  {t:0,d:.4,type:'pass',from:'9',to:'10',note:'9 to 10.'},
+  {t:.3,d:1.2,type:'run',who:'10',dx:3,dy:2.5,note:'10 runs at the defence.'},
+  {t:.5,d:1.2,type:'run',decoy:true,who:'12',dx:-1,dy:3,note:'12 runs a hard line onto the ball.'},
+  {t:.9,d:1.6,type:'run',who:'11',dx:14,dy:3.5,note:'11 comes from deep, in behind 12.'},
+  {t:1.4,d:.35,type:'dummy',from:'10',to:'12',note:'10 dummies to 12.'},
+  {t:1.8,d:.5,type:'pass',miss:true,from:'10',to:'11',note:'10 passes to 11 in the hole behind 12.'},
+  {t:2.3,d:1.3,type:'run',who:'11',dx:2,dy:5}]},
+
+{cat:'Backs',id:'exeter',name:'EXETER',blurb:'Drift them wide early, then send 13 back against the grain.',
+ players:BACKS(),ballStart:'9',actions:[
+  {t:0,d:.4,type:'pass',from:'9',to:'10',note:'9 passes to 10.'},
+  {t:.35,d:1.5,type:'run',who:'10',dx:6,dy:1,note:'10 and 12 drift wide together — early, so the defence drifts with them.'},
+  {t:.35,d:1.5,type:'run',who:'12',dx:6,dy:1},
+  {t:1.2,d:1.2,type:'run',who:'13',dx:-7.5,dy:-.6,note:'13 comes round the back of them.'},
+  {t:2.4,d:.5,type:'run',who:'13',dx:-1.5,dy:1.5,note:'...and turns up into the cut.'},
+  {t:2,d:1.2,type:'run',who:'10',dx:-2.5,dy:2.5,note:'10 and 13 cut.'},
+  {t:2.4,d:.45,type:'pass',from:'10',to:'13',note:'10 gives it to 13 coming back the other way.'},
+  {t:2.2,d:1.4,type:'run',who:'11',dx:20,dy:3,note:'11 in support.'},
+  {t:2.9,d:1.3,type:'run',who:'13',dx:-3,dy:4,note:'Once we are in space, keep the ball alive.'}]},
+
+{cat:'Backs',id:'munsterwedge',name:'MUNSTER WEDGE',blurb:'Dummy cut, block line from 13, 15 comes in short.',
+ players:BACKS(),ballStart:'9',actions:[
+  {t:0,d:.4,type:'pass',from:'9',to:'10',note:'9 to 10.'},
+  {t:.3,d:1.2,type:'run',who:'10',dx:3.5,dy:3.2,note:'10 dummy-cuts with 12.'},
+  {t:.5,d:1.2,type:'run',decoy:true,who:'12',dx:-3.5,dy:3.2},
+  {t:1.3,d:.35,type:'dummy',from:'10',to:'12',note:'Nothing goes to 12.'},
+  {t:.9,d:1.4,type:'run',decoy:true,who:'13',dx:-4.5,dy:4,note:'13 runs a block line to hold the inside defender.'},
+  {t:1.2,d:1.2,type:'run',who:'15',dx:-8,dy:4,note:'15 comes into the line CLOSE to 10.'},
+  {t:1.9,d:.4,type:'pass',from:'10',to:'15',note:'Short ball to 15.'},
+  {t:2.3,d:1.3,type:'run',who:'15',dx:2,dy:4}]},
+
+{cat:'Backs',id:'wiper',name:'WIPER',blurb:'Miss 12, and 13 either kicks the corner or runs it.',
+ players:BACKS(),ballStart:'9',actions:[
+  {t:0,d:.4,type:'pass',from:'9',to:'10',note:'9 to 10.'},
+  {t:.3,d:.9,type:'run',who:'10',dx:2,dy:1.5},
+  {t:.6,d:1.2,type:'run',decoy:true,who:'12',dx:1,dy:3,note:'12 runs hard — the ball goes over the top of him.'},
+  {t:1.2,d:.6,type:'pass',miss:true,from:'10',to:'13',note:'10 misses 12 and hits 13.'},
+  {t:1.6,d:.8,type:'run',who:'13',dx:2,dy:2,note:'13 has the call: kick, or run if their winger is sitting in the pocket.'},
+  {t:2.5,d:1.7,type:'kick',from:'13',to:{x:66,y:38},note:'13 kicks to the corner.'}]},
+
+{cat:'Backs',id:'wedge',name:'WEDGE',blurb:'The answer to a blitz. Go behind it and swing to the far channel.',
+ players:BACKS().map(p=>p.id==='11'?{...p,x:16,y:5}:p),ballStart:'9',lineSpeed:4.2,latSpeed:4.2,actions:[
+  {t:0,d:1.5,type:'run',who:'11',dx:9,dy:3,note:'They are blitzing. 11 comes in behind 10.'},
+  {t:.95,d:.55,type:'pass',from:'9',to:'11',note:'9 passes to 11 behind 10.'},
+  {t:.5,d:1,type:'run',who:'10',dx:2,dy:2,note:'10 runs a line in front to occupy the rush.'},
+  {t:1.55,d:1.3,type:'run',who:'11',dx:4,dy:2},
+  {t:1.6,d:1.5,type:'run',who:'15',dx:-14,dy:4,note:'15 attacks the opposite channel.'},
+  {t:2.2,d:.8,type:'pass',from:'11',to:'15',note:'11 puts 15 down the far channel — behind the rush.'},
+  {t:3.1,d:1.4,type:'run',who:'15',dx:-3,dy:5,note:'Keep the ball alive and flood the channel with every back in support.'},
+  {t:3.1,d:1.4,type:'run',who:'13',dx:-8,dy:5},
+  {t:3.1,d:1.4,type:'run',who:'14',dx:-10,dy:4}]},
+
+{cat:'Backs',id:'frank',name:'FRANK',blurb:'Miss pass to 13, who comes back and loops badly on purpose.',
+ players:BACKS(),ballStart:'9',actions:[
+  {t:0,d:.4,type:'pass',from:'9',to:'10',note:'9 to 10.'},
+  {t:.3,d:.9,type:'run',who:'10',dx:2,dy:1.5},
+  {t:.6,d:1.2,type:'run',decoy:true,who:'12',dx:1,dy:2.5,note:'12 runs on expecting it.'},
+  {t:1.2,d:.55,type:'pass',miss:true,from:'10',to:'13',note:'10 misses 12 and hits 13.'},
+  {t:1.5,d:1.1,type:'run',who:'13',dx:-5,dy:1,note:'13 comes BACK into the pass.'},
+  {t:2.2,d:.8,type:'run',who:'12',dx:3.5,dy:-3,note:'12 loops round behind him — a deliberately bad loop, deep and slow-looking.'},
+  {t:3,d:.5,type:'run',who:'12',dx:1.2,dy:1.4,note:'...then straightens and comes onto the ball.'},
+  {t:3,d:.45,type:'pass',from:'13',to:'12',note:'13 gives it to 12.'},
+  {t:3.45,d:1.3,type:'run',who:'12',dx:3,dy:4,note:'12 releases any of the back three, or goes himself.'}]},
+
+{cat:'Backs',id:'carter',name:'CARTER',blurb:'Two block lines, two miss passes, 15 free on the edge.',
+ players:BACKS(),ballStart:'9',actions:[
+  {t:0,d:.4,type:'pass',from:'9',to:'10',note:'9 to 10.'},
+  {t:.3,d:1,type:'run',who:'10',dx:2,dy:2},
+  {t:.5,d:1.3,type:'run',decoy:true,who:'12',dx:1,dy:3.5,note:'12 runs a block line to hold his man.'},
+  {t:1.2,d:.6,type:'pass',miss:true,from:'10',to:'13',note:'10 passes to 13 behind 12.'},
+  {t:1.5,d:1.1,type:'run',who:'13',dx:2,dy:2},
+  {t:1.8,d:1.4,type:'run',decoy:true,who:'14',dx:-3,dy:3,note:'14 runs the second block line.'},
+  {t:2.2,d:1.3,type:'run',who:'15',dx:2,dy:5.5,note:'15 comes into the line outside 13.'},
+  {t:2.8,d:.55,type:'pass',miss:true,from:'13',to:'15',note:'13 passes to 15 behind 14.'},
+  {t:3.35,d:1.3,type:'run',who:'15',dx:3,dy:4}]},
+
+{cat:'Backs',id:'stevie',name:'STEVIE',blurb:'Cut with 12, then 12 releases 11 either side of him.',
+ players:BACKS(),ballStart:'9',actions:[
+  {t:0,d:.4,type:'pass',from:'9',to:'10',note:'9 to 10.'},
+  {t:.3,d:1.1,type:'run',who:'10',dx:3.5,dy:3.2,note:'10 cuts with 12 and gives him the ball.'},
+  {t:.5,d:1.1,type:'run',who:'12',dx:-3.5,dy:3.2},
+  {t:1.3,d:.4,type:'pass',from:'10',to:'12',note:'Ball to 12 off the cut.'},
+  {t:1.7,d:1,type:'run',who:'12',dx:-2,dy:2.5},
+  {t:1.6,d:1.3,type:'run',who:'11',dx:14,dy:3,note:'11 arrives late — 12 can send him inside or outside.'},
+  {t:2.5,d:.5,type:'pass',from:'12',to:'11',note:'12 to 11.'},
+  {t:3,d:1.2,type:'run',who:'11',dx:2,dy:4}]},
+
+{cat:'Backs',id:'accies',name:'ACCIES',blurb:'9 skips straight to 11, and 10 appears behind 12.',
+ players:BACKS(),ballStart:'9',actions:[
+  {t:0,d:1.25,type:'run',who:'11',dx:8,dy:1,note:'11 comes off his wing.'},
+  {t:.7,d:.55,type:'pass',miss:true,from:'9',to:'11',note:'9 passes straight to 11.'},
+  {t:.5,d:1.3,type:'run',decoy:true,who:'12',dx:-3,dy:3.5,note:'12 runs an in-line to hold the defence.'},
+  {t:.6,d:1.2,type:'run',who:'10',dx:-3,dy:-4.4,note:'10 drops in behind 12.'},
+  {t:1.8,d:.85,type:'run',who:'10',dx:-.5,dy:2.6,note:'...and comes forward onto the ball.'},
+  {t:1.4,d:1,type:'run',who:'11',dx:3,dy:2},
+  {t:2.1,d:.55,type:'pass',from:'11',to:'10',note:'11 passes to 10 in behind 12.'},
+  {t:2.65,d:1.3,type:'run',who:'10',dx:4,dy:4}]},
+
+{cat:'Backs',id:'wasps',name:'WASPS',blurb:'8 off the scrum with five runners cutting across the defence.',
+ players:[...PACK(24,14),A('9',28,12),A('10',34,10),A('12',41,9),A('13',50,8),
+  A('11',19,5),A('14',60,7),A('15',50,2),
+  Df('o9',28.5,17.8,'9'),Df('o10',36,17,'10'),Df('o12',44,17,'12'),Df('o13',52,17,'13'),Df('o14',61,16,'14')],
+ ballStart:'8',actions:[
+  {t:0,d:.6,type:'run',who:'8',dx:1,dy:2,note:'8 picks up and attacks their 12 on the inside shoulder.'},
+  {t:.4,d:1.5,type:'run',who:'12',dx:-5,dy:5,note:'12 runs an in-line at their 10.'},
+  {t:.4,d:1.5,type:'run',who:'11',dx:15,dy:4.8,note:'11 runs into their 10/12 channel.'},
+  {t:.4,d:1.5,type:'run',who:'9',dx:12,dy:4,note:'9 runs into their 12/13 channel.'},
+  {t:.4,d:1.5,type:'run',who:'10',dx:14,dy:5,note:'10 runs at their 13 inside shoulder.'},
+  {t:.4,d:1.5,type:'run',who:'13',dx:6,dy:5,note:'13 runs outside their 13.'},
+  {t:.6,d:1.4,type:'run',who:'8',dx:4,dy:3},
+  {t:2,d:.6,type:'pass',from:'8',to:'11',note:'8 can pass 9, 11 or 12 — he takes whichever defender has bitten.'},
+  {t:2.6,d:1.3,type:'run',who:'11',dx:3,dy:4}],
+ check:'Every other line in this move says "oppo" when it means their player, but the first one just says "attacks 12 inside shoulder". Drawn here as their 12. Check whether 8 is meant to run at our 12\'s inside shoulder instead — it changes his line completely.'},
+
+{cat:'Backs',id:'bath',name:'BATH',blurb:'9 skips to 12, 10 loops, back three released on the edge.',
+ players:BACKS(),ballStart:'9',actions:[
+  {t:0,d:.5,type:'pass',miss:true,from:'9',to:'12',note:'9 skips straight to 12.'},
+  {t:.3,d:1.3,type:'run',who:'12',dx:1,dy:3},
+  {t:.5,d:1.4,type:'run',decoy:true,who:'13',dx:-4,dy:3.5,note:'13 runs an in-line.'},
+  {t:.6,d:1.6,type:'run',who:'10',dx:11,dy:-1,note:'10 loops round 12.'},
+  {t:2,d:.45,type:'pass',from:'12',to:'10',note:'12 passes to 10 — or to 13 on the in-line.'},
+  {t:2.45,d:1.2,type:'run',who:'10',dx:4,dy:2.5},
+  {t:2.5,d:1.4,type:'run',who:'14',dx:-3,dy:3.2,note:'Back three come up on the outside edge.'},
+  {t:3.4,d:.55,type:'pass',from:'10',to:'14',note:'10 releases the back three.'},
+  {t:3.95,d:1.2,type:'run',who:'14',dx:2,dy:4}]},
+
+{cat:'Backs',id:'backdoor',name:'BACK DOOR',blurb:'The basic one. Everyone should be able to run it.',
+ players:BACKS(),ballStart:'9',actions:[
+  {t:0,d:.4,type:'pass',from:'9',to:'10',note:'9 to 10.'},
+  {t:.3,d:1.2,type:'run',who:'10',dx:2,dy:2},
+  {t:.5,d:.4,type:'pass',from:'10',to:'12',note:'10 to 12.'},
+  {t:.7,d:1.2,type:'run',who:'12',dx:1,dy:2.5},
+  {t:1,d:1.4,type:'run',decoy:true,who:'13',dx:-4,dy:3.5,note:'13 runs a block line to occupy his defender.'},
+  {t:1.3,d:1.3,type:'run',who:'15',dx:-5,dy:5,note:'15 comes through the back door — behind 13.'},
+  {t:2,d:.5,type:'pass',miss:true,from:'12',to:'15',note:'12 passes behind 13 to 15.'},
+  {t:2.5,d:1.3,type:'run',who:'15',dx:3,dy:4}]},
+
+{cat:'Backs',id:'tenbacks',name:'10 (call)',blurb:'Not a shape — a shout. Somebody has a gap, get it to him now.',
+ players:BACKS(),ballStart:'9',actions:[
+  {t:0,d:.5,type:'run',who:'10',dx:.6,dy:1.6},
+  {t:.3,d:.5,type:'run',who:'12',dx:.6,dy:1.6},
+  {t:0,d:.35,type:'pass',from:'9',to:'10',note:'13 sees space in front of him and calls "10".'},
+  {t:.35,d:.35,type:'pass',from:'10',to:'12',note:'The ball goes there as fast as it can — no shape, no decoys.'},
+  {t:.7,d:.35,type:'pass',from:'12',to:'13'},
+  {t:1.1,d:1.1,type:'run',who:'13',dx:0,dy:3,note:'13 runs onto it flat and goes through the gap.'},
+  {t:1.8,d:1.3,type:'run',who:'13',dx:1,dy:4.5}]},
+
+/* ============ TARANAKI ============ */
+{cat:'Taranaki',id:'taranaki',name:'TARANAKI — set-up',type:'formation',
+ blurb:'The platform for every A and B option inside their 22.',
+ players:TAR(),
+ html:`<p>Set right across the pitch, with <b>12 lined up opposite their 13</b>. The whole point is to build a 2 v 1 somewhere, depending on how they set up defensively.</p>
+ <p>Every back must be ready to receive a pass at any moment, and the call is made <b>early</b>, off what their defence shows.</p>
+ <p><b>A calls</b> are options for 10. <b>B calls</b> are options for 12, off quick ball from 10.</p>`},
+
+{cat:'Taranaki',id:'a1',name:'A1',blurb:'10 runs an out-angle, 11 comes underneath.',
+ players:TAR(),ballStart:'9',actions:[
+  {t:0,d:.45,type:'pass',from:'9',to:'10',note:'9 to 10.'},
+  {t:.3,d:1.3,type:'run',who:'10',dx:4.5,dy:4,note:'10 runs an out-angle, taking their 12 across with him.'},
+  {t:.6,d:1.4,type:'run',who:'11',dx:8,dy:4,note:'11 comes underneath on the inside.'},
+  {t:1.75,d:.45,type:'pass',from:'10',to:'11',note:'10 gives inside to 11.'},
+  {t:2.2,d:1.3,type:'run',who:'11',dx:2,dy:4}]},
+
+{cat:'Taranaki',id:'a2',name:'A2',blurb:'10 runs an in-angle, 11 outside him.',
+ players:TAR(),ballStart:'9',actions:[
+  {t:0,d:.45,type:'pass',from:'9',to:'10',note:'9 to 10.'},
+  {t:.3,d:1.3,type:'run',who:'10',dx:-3.5,dy:3.5,note:'10 runs an in-angle, back towards the forwards.'},
+  {t:.6,d:1.4,type:'run',who:'11',dx:12,dy:4,note:'11 runs outside 10 into the space he has vacated.'},
+  {t:1.85,d:.45,type:'pass',from:'10',to:'11',note:'10 pops outside to 11.'},
+  {t:2.3,d:1.3,type:'run',who:'11',dx:3,dy:4}]},
+
+{cat:'Taranaki',id:'a3',name:'A3',blurb:'10 straight to fix, ball over the top to 13.',
+ players:TAR(),ballStart:'9',actions:[
+  {t:0,d:.45,type:'pass',from:'9',to:'10',note:'9 to 10.'},
+  {t:.3,d:1.3,type:'run',who:'10',dx:1,dy:3.5,note:'10 runs dead straight to fix his defender.'},
+  {t:.6,d:1.5,type:'run',decoy:true,who:'12',dx:1,dy:3,note:'12 runs on to hold his man.'},
+  {t:1.5,d:1.3,type:'run',who:'13',dx:1,dy:2.5},
+  {t:1.7,d:.7,type:'pass',miss:true,from:'10',to:'13',note:'Ball goes over the top — 13 gets it outside.'},
+  {t:2.5,d:1.3,type:'run',who:'13',dx:3,dy:4}]},
+
+{cat:'Taranaki',id:'a4',name:'A4',blurb:'13 takes a dummy crash, ball goes behind him to 11.',
+ players:TAR().map(p=>p.id==='11'?{...p,x:26,y:2.5}:p),ballStart:'9',actions:[
+  {t:0,d:.45,type:'pass',from:'9',to:'10',note:'9 to 10.'},
+  {t:.3,d:1.2,type:'run',decoy:true,who:'10',dx:1,dy:3,note:'10 fixes his defender.'},
+  {t:.6,d:1.4,type:'run',decoy:true,who:'13',dx:-4,dy:4,note:'13 takes a dummy crash ball — he wants the defence to buy it.'},
+  {t:1,d:1.6,type:'run',who:'11',dx:14,dy:5.5,note:'11 runs from deep, behind 13.'},
+  {t:1.9,d:.8,type:'pass',miss:true,from:'10',to:'11',note:'The ball goes behind the crash to 11.'},
+  {t:2.8,d:1.3,type:'run',who:'11',dx:3,dy:4}]},
+
+{cat:'Taranaki',id:'b1',name:'B1',blurb:'12 fixes their 13, 13 holds their 12, 15 makes it 2 v 1.',
+ players:TAR(),ballStart:'9',actions:[
+  {t:0,d:.4,type:'pass',from:'9',to:'10',note:'9 to 10.'},
+  {t:.2,d:.6,type:'run',who:'10',dx:2,dy:1},
+  {t:.6,d:.5,type:'pass',from:'10',to:'12',note:'Ball moved quickly to 12.'},
+  {t:.8,d:1.4,type:'run',who:'12',dx:2,dy:3,note:'12 runs at their 13 to fix him.'},
+  {t:1,d:1.4,type:'run',decoy:true,who:'13',dx:-5,dy:4,note:'13 runs on the INSIDE of 12 to hold their 12.'},
+  {t:1.4,d:1.5,type:'run',who:'15',dx:8,dy:6,note:'15 comes into the line outside — where he starts behind their line decides how good this is.'},
+  {t:2.4,d:.7,type:'pass',miss:true,from:'12',to:'15',note:'12 passes outside to 15.'},
+  {t:3.2,d:1.2,type:'run',who:'15',dx:3,dy:3},
+  {t:3.3,d:1.2,type:'run',who:'14',dx:-2,dy:3.2,note:'2 v 1 with the winger.'},
+  {t:4.1,d:.5,type:'pass',from:'15',to:'14',note:'Draw and give.'}]},
+
+{cat:'Taranaki',id:'b2',name:'B2',blurb:'12 gives inside to 13 — only if the inside gap is there.',
+ players:TAR(),ballStart:'9',actions:[
+  {t:0,d:.4,type:'pass',from:'9',to:'10',note:'9 to 10.'},
+  {t:.2,d:.6,type:'run',who:'10',dx:2,dy:1.8},
+  {t:.6,d:.5,type:'pass',from:'10',to:'12',note:'Quick ball to 12.'},
+  {t:.8,d:1.3,type:'run',who:'12',dx:2,dy:3},
+  {t:1,d:1.4,type:'run',who:'13',dx:-5.5,dy:4,note:'13 comes back inside 12 — only run it if there is a gap inside their defence.'},
+  {t:2.2,d:.45,type:'pass',from:'12',to:'13',note:'12 gives inside.'},
+  {t:2.65,d:1.3,type:'run',who:'13',dx:-2,dy:4},
+  {t:2.5,d:1.4,type:'run',who:'10',dx:6,dy:4,note:'10 and 11 chase for the support.'},
+  {t:2.5,d:1.4,type:'run',who:'11',dx:14,dy:5}]},
+
+{cat:'Taranaki',id:'b3',name:'B3',blurb:'12 puts 11 through on the inside while 13 holds the man outside.',
+ players:TAR(),ballStart:'9',actions:[
+  {t:0,d:.4,type:'pass',from:'9',to:'10',note:'9 to 10.'},
+  {t:.2,d:.6,type:'run',who:'10',dx:2,dy:1},
+  {t:.6,d:.5,type:'pass',from:'10',to:'12',note:'Quick ball to 12.'},
+  {t:.8,d:1.3,type:'run',who:'12',dx:2,dy:3},
+  {t:1,d:1.5,type:'run',who:'11',dx:16,dy:6,note:'11 comes from deep on the inside.'},
+  {t:1,d:1.4,type:'run',decoy:true,who:'13',dx:2,dy:3,note:'13 stays out and holds his defender.'},
+  {t:2.3,d:.5,type:'pass',from:'12',to:'11',note:'12 passes inside — 11 goes through the gap.'},
+  {t:2.8,d:1.3,type:'run',who:'11',dx:2,dy:4}]},
+
+{cat:'Taranaki',id:'b4',name:'B4',blurb:'Ball inside to 13 with options on both sides of him.',
+ players:TAR(),ballStart:'9',actions:[
+  {t:0,d:.4,type:'pass',from:'9',to:'10',note:'9 to 10.'},
+  {t:.2,d:.6,type:'run',who:'10',dx:2,dy:1},
+  {t:.6,d:.5,type:'pass',from:'10',to:'12',note:'Quick ball to 12.'},
+  {t:.8,d:1.3,type:'run',who:'12',dx:2,dy:3},
+  {t:1,d:1.4,type:'run',who:'13',dx:-5.5,dy:4,note:'13 comes back on the inside.'},
+  {t:1.1,d:1.6,type:'run',who:'11',dx:14,dy:5,note:'11 inside him...'},
+  {t:1.1,d:1.6,type:'run',who:'15',dx:2,dy:6,note:'...15 outside him. 13 has an option both sides.'},
+  {t:2.2,d:.45,type:'pass',from:'12',to:'13',note:'12 gives inside to 13.'},
+  {t:2.7,d:1.3,type:'run',who:'13',dx:-1,dy:4}]},
+
+{cat:'Taranaki',id:'b5',name:'B5',blurb:'9 loops 10 instead, and puts 15 into the outside channel.',
+ players:TAR(),ballStart:'9',actions:[
+  {t:0,d:.4,type:'pass',from:'9',to:'10',note:'9 to 10 — but instead of 10 passing to 12...'},
+  {t:.3,d:1,type:'run',who:'9',dx:9,dy:-2.5,note:'...9 loops round 10.'},
+  {t:1.3,d:.7,type:'run',who:'9',dx:3,dy:1.5,note:'...and comes forward onto the return.'},
+  {t:.4,d:1,type:'run',who:'10',dx:2,dy:2},
+  {t:1.6,d:.45,type:'pass',from:'10',to:'9',note:'10 gives it back to the looping 9.'},
+  {t:2.05,d:1,type:'run',who:'9',dx:4,dy:1},
+  {t:1.8,d:1.6,type:'run',decoy:true,who:'12',dx:-6,dy:4,note:'12 runs an in-angle to fix the inside defenders.'},
+  {t:2.2,d:1.6,type:'run',who:'15',dx:6,dy:6,note:'15 attacks the outside channel.'},
+  {t:2.7,d:.8,type:'pass',from:'9',to:'15',note:'9 puts 15 away.'},
+  {t:3.5,d:1.3,type:'run',who:'15',dx:3,dy:3,note:'13 and 14 in support — good option when we already have the outside edge.'},
+  {t:3.5,d:1.3,type:'run',who:'13',dx:3,dy:4},
+  {t:3.5,d:1.3,type:'run',who:'14',dx:0,dy:4}]},
+
+/* ============ KICKING ============ */
+{cat:'Kicking',id:'apple',name:'APPLE — box kick',blurb:'9 from the base. Contestable height, winger and two forwards chase hard, the rest hold a line.',
+ players:[RUCK(20,14),A('9',21,12.4),A('11',8,9),A('7',24,11.5),A('F2',16,11),A('10',32,9),A('12',40,8),A('13',48,8),A('15',38,2),A('14',60,7),
+  Df('d1',22,17.5),Df('d2',29,17.5),Df('d3',36,17.5),Df('d4',43,17.5),Df('d5',50,17.5),Df('d6',58,17.5),Df('o15',16,34,'15'),Df('o11',6,30,'11')],
+ ballStart:'9',staticDef:true,actions:[
+  {t:0,d:.5,type:'run',who:'9',dx:-1.5,dy:-.8,slow:true,note:'APPLE. 9 steps back off the base and puts it up — height over distance, so it is a contest when it comes down.'},
+  {t:.5,d:2.3,type:'kick',from:'9',to:{x:13,y:31}},
+  {t:.4,d:2.4,type:'run',who:'11',dx:4,dy:21,note:'11 is already going when the ball is kicked — he arrives as it comes down.'},
+  {t:.7,d:2.2,type:'run',who:'7',dx:-8,dy:17,note:'Two forwards chase with him to clean up the slap-down or the tackle.'},
+  {t:.7,d:2.2,type:'run',who:'F2',dx:-2,dy:16},
+  {t:1.2,d:1.6,type:'run',who:'o15',dx:-2,dy:-2.5,note:'Their 15 has to take it under pressure.'},
+  {t:1,d:1.8,type:'run',who:'10',dx:0,dy:6,note:'Everyone else goes up together as a line — nobody gets in front of the kicker.'},
+  {t:1,d:1.8,type:'run',who:'12',dx:0,dy:6},
+  {t:1,d:1.8,type:'run',who:'13',dx:0,dy:6},
+  {t:1,d:1.8,type:'run',who:'14',dx:0,dy:6}],
+ check:'The playbook gives the call and the kick, not the chase — the chase shown is the standard one (winger plus two, line behind). Confirm who you want chasing.'},
+
+{cat:'Kicking',id:'pear',name:'PEAR — grubber',blurb:'10 puts it along the ground through the line for 13 to run onto.',
+ players:BACKS(),ballStart:'9',staticDef:true,actions:[
+  {t:0,d:.4,type:'pass',from:'9',to:'10',note:'PEAR. The defence is flat and pressing — there is grass behind them.'},
+  {t:.3,d:.9,type:'run',who:'10',dx:1.5,dy:2.5},
+  {t:1.2,d:1.4,type:'kick',from:'10',to:{x:42,y:24},low:true,note:'10 grubbers through the gap between their 12 and 13 — along the ground, not a chip.'},
+  {t:.9,d:1.9,type:'run',who:'13',dx:-3,dy:15,note:'13 is onto it the moment it is struck — he must be behind the kicker when the ball leaves the boot.'},
+  {t:1,d:1.8,type:'run',who:'12',dx:1,dy:9,note:'12 and 14 chase as the support either side.'},
+  {t:1,d:1.8,type:'run',who:'14',dx:-6,dy:10},
+  {t:1.4,d:1.4,type:'run',who:'d4',dx:0,dy:-2,note:'Their line has to turn — the hardest thing in defence.'},
+  {t:1.4,d:1.4,type:'run',who:'d5',dx:0,dy:-2}]},
+
+{cat:'Kicking',id:'orange',name:'ORANGE — kick to the corner',blurb:'Ball to the corner, into touch if we can. Then squeeze the throw.',
+ players:BACKS(),ballStart:'9',staticDef:true,actions:[
+  {t:0,d:.4,type:'pass',from:'9',to:'10',note:'ORANGE. Green zone, or Plan C anywhere — put it in the corner and make them play from there.'},
+  {t:.3,d:.9,type:'run',who:'10',dx:1.5,dy:2},
+  {t:1.2,d:2.3,type:'kick',from:'10',to:{x:67,y:39},note:'10 kicks for the corner. Bouncing into touch is ideal; dead ball is the one we cannot have.'},
+  {t:1,d:2.4,type:'run',who:'14',dx:2,dy:24,note:'14 chases the touchline to shut the counter down.'},
+  {t:1,d:2.4,type:'run',who:'13',dx:6,dy:18,note:'13 inside him.'},
+  {t:1.2,d:2,type:'run',who:'15',dx:6,dy:10,note:'Everyone else up as a line — we squeeze every opposition restart.'},
+  {t:1.2,d:2,type:'run',who:'12',dx:2,dy:10},
+  {t:1.2,d:2,type:'run',who:'10',dx:1,dy:9}]},
+
+{cat:'Kicking',id:'redexit',name:'RED ZONE — exit kick',blurb:'Inside our 22. One phase of Chaos to get the angle, then 10 or 15 kicks long. It MUST find touch.',
+ players:[RUCK(22,8),A('9',24,6.6),A('F1',27,6.6),A('F2',26,4.5),A('F3',30,4.5),A('10',34,3),A('15',40,1.5),A('11',8,2),A('14',62,4),A('12',46,5),
+  Df('d1',22,12),Df('d2',28,12),Df('d3',34,12),Df('d4',40,12),Df('d5',46,12),Df('d6',52,12),Df('o15',45,30,'15'),Df('o14',66,28,'14'),Df('o11',6,26,'11')],
+ ballStart:'F1',staticDef:true,tryline:0,actions:[
+  {t:0,d:1,type:'run',who:'F1',dx:1,dy:2.8,hold:true,note:'Red zone. F1 picks and goes — one Chaos carry to straighten the ruck and give the kicker his angle to the near touchline.'},
+  {t:.8,d:.9,type:'run',who:'F2',dx:2,dy:4,hold:true,note:'F2 cleans it out. Nothing else happens in here — we get out.'},
+  {t:1.2,d:.9,type:'run',who:'9',dx:1.5,dy:1.8,slow:true},
+  {t:1.8,d:.3,type:'pass',from:'F1',to:'9'},
+  {t:2.1,d:.7,type:'pass',from:'9',to:'15',note:'Long ball to the kicker — 10 or 15, whoever has the angle. Here it is 15.'},
+  {t:2.2,d:.6,type:'run',who:'15',dx:1,dy:1.6},
+  {t:3,d:2.4,type:'kick',from:'15',to:{x:69.4,y:34},note:'Long, into touch. Distance only counts if it goes out.'},
+  {t:3.1,d:2.3,type:'run',who:'14',dx:1,dy:14,note:'14 races up the touchline.'},
+  {t:3.1,d:2.3,type:'run',who:'12',dx:0,dy:12,note:'The line moves up together behind the kick.'},
+  {t:3.1,d:2.3,type:'run',who:'10',dx:0,dy:12},
+  {t:3.1,d:2.3,type:'run',who:'F3',dx:0,dy:10}]},
+
+{cat:'Kicking',id:'paisleykick',name:'PAISLEY KICK — chase shape',blurb:'When we kick: nearest man chases with two more squeezing the receiver, the rest form a line, three drop back, 9 sweeps.',
+ players:[A('10',30,10),A('9',24,12),A('12',38,10),A('13',46,10),A('7',22,10),A('14',62,8),A('11',8,8),A('15',38,3),A('F1',28,10),A('F2',34,10),A('F3',44,10),A('F4',52,10),
+  Df('o15',40,36,'15'),Df('o14',62,32,'14'),Df('o11',8,32,'11'),Df('d1',26,17),Df('d2',34,17),Df('d3',42,17),Df('d4',50,17),Df('d5',58,17)],
+ ballStart:'10',staticDef:true,actions:[
+  {t:0,d:.6,type:'run',who:'10',dx:1,dy:1,slow:true,note:'10 kicks long down the middle.'},
+  {t:.6,d:2.4,type:'kick',from:'10',to:{x:41,y:35}},
+  {t:.6,d:2.5,type:'run',who:'12',dx:3,dy:22,note:'Nearest man to the kicker chases...'},
+  {t:.8,d:2.4,type:'run',who:'13',dx:-3,dy:21,note:'...with two more. Squeeze the receiver so he can only take the tackle or kick it back.'},
+  {t:.8,d:2.4,type:'run',who:'F3',dx:-1,dy:20},
+  {t:1,d:2.2,type:'run',who:'F1',dx:0,dy:9,note:'Everyone else forms the defensive line to cover their counter.'},
+  {t:1,d:2.2,type:'run',who:'F2',dx:0,dy:9},
+  {t:1,d:2.2,type:'run',who:'F4',dx:0,dy:9},
+  {t:1,d:2.2,type:'run',who:'7',dx:0,dy:9},
+  {t:1,d:2.2,type:'run',who:'14',dx:0,dy:9},
+  {t:1,d:2.2,type:'run',who:'10',dx:-2,dy:7},
+  {t:1,d:2,type:'run',who:'11',dx:2,dy:-4,note:'Three drop back into a spread in case the return kick comes.'},
+  {t:1,d:2,type:'run',who:'15',dx:0,dy:-1},
+  {t:.8,d:2.2,type:'run',who:'9',dx:4,dy:4,slow:true,note:'9 sweeps behind the line to cover and organise it.'},
+  {t:1.5,d:1.5,type:'run',who:'o15',dx:1,dy:-2}],
+ check:'The book names the shape, not who fills it. Drawn here with 12 as the nearest chaser and 11/15 dropping; swap in whoever is actually nearest on the day.'},
+
+/* ============ LINEOUT ============ */
+{cat:'Lineout',id:'locodes',name:'Line-out codes',type:'info',blurb:'How to read the number, and what the letters change.',
+ html:`<h3>The number</h3>
+ <p>Four digits. Only the <b>middle two</b> mean anything: the first of them is the <b>jersey of the jumper</b>, the second is <b>where in the line-out the ball goes</b> — front = 1, middle = 2, back = 3.</p>
+ <p><code>7514</code> → jumper <b>5</b>, space <b>1</b> (front). Ball off the top, straight to 9. The 7 and the 4 are noise.</p>
+ <h3>The prefix changes the ball</h3>
+ <ul>
+ <li>A <b>colour</b> = lob ball. <code>Red 7514</code> — the jumper steps one forward, then two back.</li>
+ <li>Starts with <b>S</b> = switch ball.</li>
+ <li>Starts with <b>D</b> = catch and drive.</li>
+ <li>Starts with <b>P</b> / <code>POCKET</code> = pocket ball. The jumper returns to ground and pops it to a runner or to 9.</li>
+ </ul>
+ <h3>How we move</h3>
+ <p>All movement goes <b>down the middle</b> of the line-out. If the middle jumper is going to the front, he travels straight forward, the others step out of the space and fill in behind him, and his lifter follows. Everything stays dynamic and quick.</p>
+ <p>The thrower throws, <b>then</b> the jumper goes up to meet it in the air — that stops them getting up before us.</p>
+ <h3>10 call</h3>
+ <p>Called by the jumper. If the opposition are sleeping, quick ball to 1 in the line-out and we're away.</p>
+ <h3>Standards</h3>
+ <ul><li>Quick and dynamic, every time.</li><li>Nobody back-pedals — turn, run back to your position, then lift.</li>
+ <li>Beat them by being there first. If they're not ready, get the ball in.</li><li>Keep the tempo of the game high.</li></ul>`},
+
+{cat:'Lineout',id:'lofull',name:'Full-man set-up',type:'formation',blurb:'H / 1 4 3 5 6 7 8, with the scrum half behind.',
+ players:LINEOUT([1,4,3,5,6,7,8]),
+ html:`<p>Seven in the line, thrower on the touchline, 9 in behind. Front of the line is nearest the thrower.</p>`},
+{cat:'Lineout',id:'losix',name:'Six-man set-up',type:'formation',blurb:'1p 2j 3l — 4l 5j 6p. Two pods of three.',
+ players:LINEOUT(['1p','2j','3l','4l','5j','6p']),
+ html:`<p>Read as two pods: <b>p</b> = pod man, <b>j</b> = jumper, <b>l</b> = lifter. Positions 1–3 make the front pod, 4–6 the back pod.</p>`},
+{cat:'Lineout',id:'lofive',name:'Five-man set-up',type:'formation',blurb:'1p 2j 3j 4j 5p — three jumpers to pick from.',
+ players:LINEOUT(['1p','2j','3j','4j','5p']),
+ html:`<p>A pod man at each end and three jumping options between them.</p>`},
+{cat:'Lineout',id:'lofour',name:'Four-man set-up',type:'formation',blurb:'9 in the line, 1p, 5j, 6j.',
+ players:LINEOUT(['9','1p','5j','6j']),
+ html:`<p>Shortened line with 9 at the front — quick ball, quick exit.</p>`},
+{cat:'Lineout',id:'lothree',name:'Three-man set-up',type:'formation',blurb:'1p, 4j, 5j.',
+ players:LINEOUT(['1p','4j','5j']),
+ html:`<p>Minimum numbers, maximum space behind. Get it moving fast.</p>`},
+
+{cat:'Lineout',id:'southafrica',name:'SOUTH AFRICA',blurb:'Attacking their line. Sell a front lift, sell a drive, then send 4 through the middle.',
+ players:LINEOUT([1,4,3,5,6,7,8]),ballStart:'H',tryline:19,staticDef:true,actions:[
+  {t:0,d:.6,type:'lift',who:'4',note:'1 DUMMY-lifts 4 at the front. The ball is not going there.'},
+  {t:.25,d:.65,type:'pass',from:'H',to:'5',note:'The throw goes to 5 in the middle.'},
+  {t:.5,d:.5,type:'lift',who:'5'},
+  {t:.9,d:.8,type:'run',who:'3',dx:2,dy:0,note:'3 and 6 lift and bind onto 5 — this is to sell the drive.'},
+  {t:.9,d:.8,type:'run',who:'6',dx:-2,dy:0},
+  {t:1.7,d:.7,type:'run',who:'5',dx:0,dy:-.7,note:'5 comes back to ground.'},
+  {t:2,d:.9,type:'run',who:'4',dx:.5,dy:-1.6,note:'4 drops off the front.'},
+  {t:2.5,d:.4,type:'pass',from:'5',to:'4',note:'5 passes to 4.'},
+  {t:2.9,d:1.9,type:'run',who:'4',dx:11,dy:7.5,note:'4 sprints between 7 and 8.'},
+  {t:2.95,d:1.9,type:'run',who:'1',dx:10,dy:5.6,note:'1 comes with him off the front as his support.'},
+  {t:3,d:1.7,type:'run',who:'7',dx:5,dy:5.4,note:'7 and 8 support him over the line.'},
+  {t:3,d:1.7,type:'run',who:'8',dx:-5,dy:5.4}]},
+
+{cat:'Lineout',id:'sweenie',name:'SWEENIE BALL',blurb:'Lob to 4, off the top to the hooker, 5 into the blindside channel. Five metres out only.',
+ players:LINEOUT([1,4,3,5,6,7,8]),ballStart:'H',tryline:19,staticDef:true,actions:[
+  {t:0,d:.5,type:'lift',who:'4',note:'Lob ball to 4.'},
+  {t:.15,d:.6,type:'pass',from:'H',to:'4',note:'Throw goes up to 4.'},
+  {t:.75,d:1.2,type:'run',who:'H',dx:3.5,dy:-.6,note:'The hooker is already running into the pitch.'},
+  {t:.9,d:.5,type:'pass',from:'4',to:'H',note:'4 takes it off the top and gives it straight to the hooker.'},
+  {t:1.1,d:1.1,type:'run',who:'5',dx:-8,dy:-3,note:'5 runs back towards the sideline.'},
+  {t:2.2,d:.4,type:'run',who:'5',dx:-1.5,dy:1.2,note:'...and turns up onto the pop.'},
+  {t:1.25,d:1.1,type:'run',who:'6',dx:-8,dy:-4.2,note:'6 goes with him as his support.'},
+  {t:2.35,d:.4,type:'run',who:'6',dx:-1.5,dy:1},
+  {t:2.1,d:.45,type:'pass',from:'H',to:'5',note:'Pop pass to 5.'},
+  {t:2.6,d:1.5,type:'run',who:'5',dx:-2,dy:6.5,note:'5 targets the blindside channel. Only run this within 5m of their line.'},
+  {t:2.75,d:1.5,type:'run',who:'6',dx:-1.5,dy:6,note:'6 on his shoulder for the offload or the clear-out.'}]},
+
+{cat:'Lineout',id:'driveball',name:'DRIVE BALL',blurb:'Catch and drive. Narrow, tight, short steps, ball down the middle by hand.',
+ players:LINEOUT([1,4,3,5,6,7,8]),ballStart:'H',tryline:19,staticDef:true,actions:[
+  {t:0,d:.5,type:'lift',who:'5',note:'Jumper takes it and comes straight back to ground.'},
+  {t:.15,d:.6,type:'pass',from:'H',to:'5'},
+  {t:.9,d:.7,type:'run',who:'3',dx:1.3,dy:.2,note:'Both lifters turn and face forward, in the direction of the drive.'},
+  {t:.9,d:.7,type:'run',who:'6',dx:-1.3,dy:.2},
+  {t:1.3,d:.8,type:'run',who:'7',dx:-3,dy:-.5,note:'First man in takes the ball. He has to stay attached to the jumper at all times.'},
+  {t:1.6,d:2.4,type:'run',who:'5',dx:.5,dy:4.5,note:'The maul drives — short steps, narrow and tight. The ball is transferred by hand, not by sliding backwards, and it travels down the middle.'},
+  {t:1.6,d:2.4,type:'run',who:'3',dx:.6,dy:4.5},
+  {t:1.6,d:2.4,type:'run',who:'6',dx:.4,dy:4.5},
+  {t:1.7,d:2.3,type:'run',who:'7',dx:.6,dy:4.4},
+  {t:1.7,d:2.3,type:'run',who:'8',dx:-2,dy:4.4},
+  {t:1.8,d:2.2,type:'run',who:'4',dx:2,dy:4.2},
+  {t:1.8,d:2.2,type:'run',who:'1',dx:2.5,dy:4.2}],
+ check:'Drive slightly inwards first, then straighten it up.'},
+
+{cat:'Lineout',id:'switchball',name:'SWITCH BALL',blurb:'Full-man call. Ball to one end, then passed to the other end to set the maul.',
+ players:LINEOUT([1,4,3,5,6,7,8]),ballStart:'H',staticDef:true,actions:[
+  {t:0,d:.5,type:'lift',who:'6',note:'Normal call — say the ball is going to the back.'},
+  {t:.15,d:.7,type:'pass',from:'H',to:'6',note:'Caught at the highest point.'},
+  {t:.9,d:1,type:'run',who:'1',dx:.5,dy:-2,note:'The front of the line-out steps back off the line.'},
+  {t:1.5,d:.7,type:'pass',from:'6',to:'1',note:'Ball is passed down to the front jumper.'},
+  {t:2.2,d:1.2,type:'run',who:'1',dx:1,dy:2,note:'Maul is set once they commit to it. Same in reverse if the ball goes to the front — the back lifter steps out to take it off the top.'}]},
+
+{cat:'Lineout',id:'defence_lo',name:'Defending a line-out',type:'formation',
+ blurb:'Two pods, and the BLITZ option.',players:LINEOUT(['2A','4A','1A','3B','5B','6B']),
+ html:`<h3>Full line-out</h3>
+ <p>Organise into two pods, each with two lifters and a jumper. The letter on each man is his pod.</p>
+ <ul><li><b>Pod A:</b> 2, 4 and 1</li><li><b>Pod B:</b> 3, 5 and 6</li></ul>
+ <h3>If they shorten it</h3>
+ <p>9 stands at the front of the line-out and our jumper takes the 9 position. When the ball is thrown, the jumper steps into the space it's going to and competes. 9 sweeps round behind.</p>
+ <h3>BLITZ</h3>
+ <p>We don't compete for the throw at all. We sack their catcher the second he touches the deck. The two players either side of the sacker drive through between their lifters and the catcher as soon as they land. No drive, no play, and they're slowed right down.</p>`},
+
+/* ============ KICK-OFF ============ */
+{cat:'Kick-off',id:'ourkick',name:'Our kick-off',blurb:'Attack the ball in the air. Diamond of support around the jumper.',
+ players:[A('10',35,22.5),A('7',22,23),A('6',15,23),A('8',12,25),A('4',18,24.5),A('5',26,24),
+  Df('do1',13,36,''),Df('do2',19,36,''),Df('do3',25,35,''),Df('do4',31,35,'')],
+ ballStart:'10',halfway:23,staticDef:true,actions:[
+  {t:0,d:1.7,type:'kick',from:'10',to:{x:15,y:33.5},note:'The kick is a contest, not a clearance — we are attacking it.'},
+  {t:.2,d:1.8,type:'run',who:'7',dx:-7,dy:10.5,note:'Our fastest forward targets the ball and jumps for it.'},
+  {t:.3,d:1.8,type:'run',who:'6',dx:0,dy:14,note:'The others form a diamond around him — one in front...'},
+  {t:.3,d:1.8,type:'run',who:'4',dx:-7,dy:9,note:'...one either side...'},
+  {t:.3,d:1.8,type:'run',who:'5',dx:-7,dy:9.5},
+  {t:.3,d:1.8,type:'run',who:'8',dx:3,dy:5,note:'...and one behind.'},
+  {t:2.1,d:.8,type:'lift',who:'7',note:'It is a 50/50 ball. If either jumper slaps it backwards, we have a man in that area already.'}]},
+{cat:'Kick-off',id:'receiving',name:'Receiving a kick',type:'formation',
+ blurb:'H, two jumpers, two lifters, 6 and 7, then 8.',
+ players:[A('H',30,30,'H'),A('J1',26,27,'J'),A('J2',34,27,'J'),A('L1',26,24,'L'),A('L2',34,24,'L'),
+  A('6',27,21,'6'),A('7',33,21,'7'),A('8',30,18,'8')],
+ html:`<p>The jumper <b>attacks</b> the ball — we don't wait for it. Everyone else works hard to get round the catcher, then we set a maul or a ruck.</p>
+ <p>Once that's set, we want the ball in 9's hands quickly.</p>
+ <h3>Next phase</h3>
+ <p>A <b>LION</b> call, openside or blindside depending on where the first ruck formed — 9 makes that call.</p>
+ <p>If <b>ESCAPE</b> is called, 10 has two options: kick to the corners, or keep the ball alive in hand and build the phases to get the game plan started.</p>`},
+
+/* ============ DEFENCE ============ */
+{cat:'Defence',id:'defset',name:'Defensive set-up',type:'formation',
+ blurb:'Pillars, guards, the line, and three at the back.',
+ players:[RUCK(16,20),
+  Df('p1',13,19,'P'),Df('p2',19,19,'P'),Df('g1',22,18.5,'G'),A('9',25,18.5),Df('g2',28,18.5,'G'),
+  Df('d1',32,18.5,'D1'),Df('d2',37,18.5,'D2'),Df('d3',42,18.5,'D3'),Df('d4',47,18.5,'D4'),
+  Df('d5',52,18.5,'D5'),Df('d6',57,18.5,'D6'),Df('w14',64,17,'14'),
+  Df('w11',12,10,'11'),Df('f10',30,10,'10'),Df('f15',48,10,'15')],
+ html:`<h3>Reading it</h3>
+ <p><b>P</b> = pillar (either side of the ruck), <b>G</b> = guard, <b>D1–D6</b> = the line across, with 9 between the guards. Play is coming towards the top of the picture.</p>
+ <p>This is the ruck on the left-hand side. On the right it's the mirror image — 11 comes into the line and 14 drops back. <b>Always three at the back</b> to cover the space.</p>
+ <h3>If the ball is kicked to the touchline and we catch it</h3>
+ <p>Get it into the middle of the pitch as fast as we can. The carrier can then scan: kick back into space, run into space, or run it back to where our forwards are and restart the game plan.</p>`},
+
+{cat:'Defence',id:'defmatch',name:'Numbering up',blurb:'We are defending (blue). Pillars and guards are planted at the ruck; everyone else slides to pick up their man as the ball goes wide.',
+ weDefend:true,latSpeed:3.2,slide:8,lineSpeed:1.4,maxUp:3,
+ players:[RUCK(16,14),
+  {id:'G1',label:'G',team:'atk',x:10,y:18,post:true},{id:'P1',label:'P',team:'atk',x:13.5,y:17.6,post:true},{id:'P2',label:'P',team:'atk',x:18.5,y:17.6,post:true},{id:'G2',label:'G',team:'atk',x:22,y:18,post:true},
+  {id:'9',label:'9',team:'atk',x:16,y:20,post:true},
+  A('D1',26,18,'D1'),A('D2',31,18,'D2'),A('D3',36,18,'D3'),A('D4',41,18,'D4'),A('D5',46,18,'D5'),A('D6',51,18,'D6'),A('14',60,17.5,'14'),
+  {id:'11',label:'11',team:'atk',x:12,y:27,post:true},{id:'10',label:'10',team:'atk',x:32,y:27,post:true},{id:'15',label:'15',team:'atk',x:50,y:27,post:true},
+  Df('o9',16.5,12.6,'9'),Df('o10',24,9.5,'10'),Df('o12',32,9,'12'),Df('o13',41,8.5,'13'),Df('o15',47,4,'15'),Df('o14',55,5.5,'14'),Df('o11',8,6,'11')],
+ ballStart:'o9',actions:[
+  {t:.6,d:1.6,type:'run',who:'9',dx:7,dy:.3,slow:true},
+  {t:2.2,d:1.8,type:'run',who:'9',dx:9,dy:0,slow:true},
+  {t:1,d:1.8,type:'run',who:'11',dx:8,dy:-1,slow:true},
+  {t:1,d:1.8,type:'run',who:'10',dx:9,dy:-1,slow:true},
+  {t:1,d:1.8,type:'run',who:'15',dx:6,dy:-1,slow:true},
+  {t:2.8,d:1.6,type:'run',who:'11',dx:8,dy:0,slow:true},
+  {t:2.8,d:1.6,type:'run',who:'10',dx:7,dy:0,slow:true},
+  {t:2.8,d:1.6,type:'run',who:'15',dx:5,dy:0,slow:true},
+  {t:0,d:.45,type:'pass',from:'o9',to:'o10',note:'Their 9 clears. Pillars either side of the ruck and the guards outside them do NOT move — they own the fringe. 9 sweeps behind, the back three pendulum across.'},
+  {t:.2,d:1,type:'run',who:'o10',dx:1,dy:2.5},
+  {t:.7,d:.45,type:'pass',from:'o10',to:'o12',note:'As the ball goes wide the line slides with it — every man finds the attacker in his channel.'},
+  {t:.8,d:1,type:'run',who:'o12',dx:1,dy:2.5},
+  {t:1.3,d:.5,type:'pass',from:'o12',to:'o13'},
+  {t:1.4,d:1,type:'run',who:'o13',dx:1,dy:2.5,note:'Nobody over-chases: we only drift when the man OUTSIDE ours has passed, so the pass back inside is never on.'},
+  {t:1.6,d:1.3,type:'run',who:'o15',dx:3,dy:5.5},
+  {t:2,d:.55,type:'pass',from:'o13',to:'o15',note:'15 comes into their line — our winger and full back cover the width and the depth between them (pendulum).'},
+  {t:2.7,d:.55,type:'pass',from:'o15',to:'o14'},
+  {t:2.5,d:1.2,type:'run',who:'o14',dx:1,dy:3},
+  {t:3.3,d:1.3,type:'run',who:'o14',dx:1,dy:4.5,note:'Three at the back the whole way: 11, 10 and 15 never join the line.'}],
+ check:'Our 9 sits behind the ruck between the guards and sweeps — he is not in the line. The planted men at the ruck are G P [ruck] P G as in the playbook diagram.'},
+
+{cat:'Defence',id:'defpress',name:'Press — zoom, paddle, zoom',blurb:'We are defending (blue). Three hard steps straight up to shut the space, THEN drift out with the ball — never before we have met them.',
+ weDefend:true,press:true,lineSpeed:3.8,maxUp:6,latSpeed:3.2,slide:8,
+ players:[RUCK(16,14),
+  {id:'G1',label:'G',team:'atk',x:10,y:18,post:true},{id:'P1',label:'P',team:'atk',x:13.5,y:17.6,post:true},{id:'P2',label:'P',team:'atk',x:18.5,y:17.6,post:true},{id:'G2',label:'G',team:'atk',x:22,y:18,post:true},
+  {id:'9',label:'9',team:'atk',x:16,y:20,post:true},
+  A('D1',26,18,'D1'),A('D2',31,18,'D2'),A('D3',36,18,'D3'),A('D4',41,18,'D4'),A('D5',46,18,'D5'),A('D6',51,18,'D6'),A('14',60,17.5,'14'),
+  {id:'11',label:'11',team:'atk',x:12,y:27,post:true},{id:'10',label:'10',team:'atk',x:32,y:27,post:true},{id:'15',label:'15',team:'atk',x:50,y:27,post:true},
+  Df('o9',16.5,12.6,'9'),Df('o10',24,9.5,'10'),Df('o12',32,9,'12'),Df('o13',41,8.5,'13'),Df('o15',47,4,'15'),Df('o14',55,5.5,'14'),Df('o11',8,6,'11')],
+ ballStart:'o9',actions:[
+  {t:.6,d:1.6,type:'run',who:'9',dx:7,dy:.3,slow:true},
+  {t:2.2,d:1.8,type:'run',who:'9',dx:9,dy:0,slow:true},
+  {t:1,d:1.8,type:'run',who:'11',dx:8,dy:-1,slow:true},
+  {t:1,d:1.8,type:'run',who:'10',dx:9,dy:-1,slow:true},
+  {t:1,d:1.8,type:'run',who:'15',dx:6,dy:-1,slow:true},
+  {t:2.8,d:1.6,type:'run',who:'11',dx:8,dy:0,slow:true},
+  {t:2.8,d:1.6,type:'run',who:'10',dx:7,dy:0,slow:true},
+  {t:2.8,d:1.6,type:'run',who:'15',dx:5,dy:0,slow:true},
+  {t:0,d:.45,type:'pass',from:'o9',to:'o10',note:'Ball leaves the ruck — the line goes. Straight up, no drifting: zoom, paddle, zoom. Posts stay planted, back three hold their depth.'},
+  {t:.2,d:1,type:'run',who:'o10',dx:1,dy:2.2},
+  {t:.7,d:.45,type:'pass',from:'o10',to:'o12',note:'Closing the space this fast takes their options away and stops the carrier getting up to speed.'},
+  {t:.8,d:1,type:'run',who:'o12',dx:1,dy:2.2},
+  {t:1.3,d:.5,type:'pass',from:'o12',to:'o13',note:'Only once we have MET them do we drift out with the ball — and then we go.'},
+  {t:1.4,d:1,type:'run',who:'o13',dx:1,dy:2.2},
+  {t:1.6,d:1.3,type:'run',who:'o15',dx:3,dy:4.5},
+  {t:2,d:.55,type:'pass',from:'o13',to:'o15'},
+  {t:2.7,d:.55,type:'pass',from:'o15',to:'o14',note:'Chop, lock and block when he arrives — two men in the tackle, the third gets beyond the ball.'},
+  {t:2.5,d:1.2,type:'run',who:'o14',dx:1,dy:2.5},
+  {t:3.3,d:1.2,type:'run',who:'o14',dx:1,dy:3}]},
+
+{cat:'Defence',id:'defprinciples',name:'Defence principles',type:'info',
+ blurb:'Our mindset in defence is to regain possession.',
+ html:`<h3>Line speed</h3>
+ <p>Dynamic for the <b>first three steps — zoom, paddle, zoom</b>. That closes the space, limits the carrier's options, and stops him getting up to speed, which makes him far easier to tackle.</p>
+ <h3>Chop, lock and block</h3>
+ <p>We want a <b>double tackle</b> most of the time to stop the offload.</p>
+ <ul><li><b>Chop</b> — first man takes the legs.</li>
+ <li><b>Lock</b> — second man locks up the ball, watching his height.</li>
+ <li><b>Block</b> — third man blocks the offload or gets beyond the ball at the ruck.</li></ul>
+ <p>Even when we don't win it, that slows their ball and buys us time to set for the next phase.</p>
+ <h3>Make them run around us</h3>
+ <p>Close the space. Only drift when the man <b>outside</b> your man passes the ball — and shut down the pass back into your channel.</p>
+ <h3>Pendulum</h3>
+ <p>Against kicks and wide attacks, wingers and full back work together to give us width and depth at the same time.</p>
+ <h3>Forwards: do not honey pot</h3>
+ <p>Work hard to get into the line. There should <b>never be more than three defenders</b> in one tackle — we want more men on their feet than they have.</p>
+ <h3>Do not sell out your team-mates</h3>
+ <p>Taking a breather and asking someone else to cover your space gives them an overlap somewhere. Every time.</p>
+ <h3>Two calls</h3>
+ <ul><li><b>LOST</b> (from 9) — leave the ball, get into a defensive line across the pitch.</li>
+ <li><b>RESET</b> — repeat the call and take a step back to bring the line onside. <b>Cheap penalties are not acceptable.</b></li></ul>`},
+
+{cat:'Defence',id:'counter',name:'Counter attack',type:'info',
+ blurb:'What happens the moment we get it back — and the moment we kick it away.',
+ html:`<h3>Tackle turnover</h3>
+ <p>Ball to 10 as fast as possible, then played into space. Heads-up rugby.</p>
+ <h3>They turn us over and kick</h3>
+ <ul><li>Any three players drop back, retrieve it and make a three-man spread counter attack.</li>
+ <li>Everyone else forms a defensive line to create the counter-attack doors.</li>
+ <li>9 follows the ball to direct the attack after the first tackle.</li></ul>
+ <h3>Paisley kick</h3>
+ <ul><li>Three players drop back into a three-man spread in case they kick it straight back.</li>
+ <li>Whoever is nearest the kicker chases, with two more — squeeze the receiver so his only options are take the tackle or kick.</li>
+ <li>Everyone else forms the defensive line for their counter.</li>
+ <li>9 sweeps behind the line to cover and organise it.</li></ul>`}
+];
+
+/* ---------- compile ---------- */
+function holderAt(play,acts,t){
+  if(!play.ballStart)return null;
+  let h=play.ballStart;
+  for(const e of acts){
+    if(e.type!=='pass'&&e.type!=='kick')continue;
+    if(t<e.t+e.d)break;
+    h=e.type==='kick'?null:e.to;
+  }
+  return h;
+}
+const RUNMAX=5.6,RUNMIN=3,RUNON=4.2,MAXHEAD=26*Math.PI/180,AIMCAP=2.5,TURNRATE=110*Math.PI/180;
+/* Runs are stretched backwards so nobody covers 20m in half a second.
+   Arrival times are untouched, so every pass still lands where it was drawn. */
+function normaliseRuns(play,byId){
+  const byWho={};
+  (play.actions||[]).forEach(a=>{
+    if(a.type!=='run')return;
+    (byWho[a.who]=byWho[a.who]||[]).push({...a});
+  });
+  const catches=(play.actions||[]).filter(a=>a.type==='pass').map(a=>({to:a.to,tc:a.t+a.d}));
+  const out=[];
+  Object.keys(byWho).forEach(k=>{
+    const list=byWho[k].sort((a,b)=>(a.t+a.d)-(b.t+b.d));
+    let prevEnd=0;
+    list.forEach((r,idx)=>{
+      let endT=r.t+r.d;
+      const dist=Math.hypot(r.dx||0,r.dy||0);
+      // a receiver times his run to arrive WITH the ball: an approach run that would finish
+      // early is delayed so it ends at the catch (same line, same speed, same catch point)
+      if(play.cat!=='Lineout'){
+        const c=catches.find(c=>c.to===k&&endT<c.tc&&endT>=c.tc-.8);
+        const nextEnds=list[idx+1]?list[idx+1].t+list[idx+1].d:Infinity;
+        if(c&&nextEnds>=c.tc+.15){
+          const shift=c.tc-endT;
+          r.t+=shift;endT=c.tc;
+          const involvedBefore=(play.actions||[]).some(e=>e.type==='pass'&&((e.from===k&&e.t<c.tc-.05)||(e.to===k&&e.t+e.d<c.tc-.05)));
+          if(!involvedBefore){
+            for(let j=idx-1;j>=0;j--){
+              const q=out.filter(o=>o.who===k)[j];if(!q)break;
+              q.t+=shift;
+            }
+          }
+        }
+      }
+      let st=r.t;
+      if(dist/r.d>RUNMAX)st=endT-dist/RUNMAX;
+      else if(dist>=1.5&&dist/r.d<RUNMIN&&play.cat!=='Lineout'&&!r.slow)st=endT-dist/RUNMIN;
+      const mine=out.filter(o=>o.who===k);
+      if(mine.length)prevEnd=mine[mine.length-1].t+mine[mine.length-1].d;
+      st=Math.max(0,Math.max(prevEnd,Math.min(st,endT-.15)));
+      r.t=st;r.d=endT-st;
+      // first run of a receiver that begins at the catch: he starts deeper and is already
+      // running when the ball arrives — the end of the run does not move
+      if(idx===0&&byId&&byId[k]&&play.cat!=='Lineout'&&dist>=1.5){
+        const c=catches.find(c=>c.to===k&&r.t>=c.tc-.15&&r.t<=c.tc+.6);
+        if(c){
+          const ns=Math.max(0,c.tc-.5);
+          if(ns<r.t){
+            const f=(endT-ns)/r.d,pl=byId[k];
+            const ndx=(r.dx||0)*f,ndy=(r.dy||0)*f;
+            pl.x-=ndx-(r.dx||0);pl.y-=ndy-(r.dy||0);
+            pl.path[0]={t:0,x:pl.x,y:pl.y};
+            r.dx=ndx;r.dy=ndy;r.t=ns;r.d=endT-ns;
+          }
+        }
+      }
+      prevEnd=endT;out.push(r);
+      const cc=catches.find(c=>c.to===k&&Math.abs(c.tc-endT)<.03);
+      const nx=list[idx+1];
+      if(cc&&nx&&nx.t>cc.tc&&nx.t<=cc.tc+.7&&play.cat!=='Lineout'){
+        const oldEnd=nx.t+nx.d,dist2=Math.hypot(nx.dx||0,nx.dy||0);
+        nx.t=cc.tc;nx.d=Math.max(.15,Math.min(oldEnd-cc.tc,dist2/RUNON));
+      }
+    });
+  });
+  return out;
+}
+/* One clock for both sides.
+   Defenders read the nearest threat in their channel, fold onto him and come up.
+   The man with the ball reads them back once: he picks his hole in the first stride
+   after the catch, commits to it, and is allowed a single sidestep if it closes.
+   His heading is capped so he is always going forward, never across. */
+function simulate(play,players,byId,dur,acts){
+  const R=play.weDefend?'atk':'def',S=play.weDefend?'def':'atk';
+  const defs=players.filter(p=>p.team===R),atks=players.filter(p=>p.team===S);
+  if(!defs.length||!atks.length)return;
+  const live=!play.staticDef;
+  const lat=play.latSpeed===undefined?2:play.latSpeed;
+  const fwd=play.lineSpeed===undefined?2.2:play.lineSpeed;
+  const dt=.06,slide=play.slide||2.5,reach=8,gap=3,maxUp=play.maxUp||8;
+
+  let carrier=play.ballStart,recv=0;
+  acts.forEach(e=>{
+    if(e.type==='kick')carrier=null;
+    else if(e.type==='pass'){carrier=e.to;recv=e.t+e.d;}
+  });
+  const cp=(live&&carrier&&byId[carrier])?byId[carrier]:null;
+  const script=cp?cp.path.slice():null;
+  const cpath=cp?script.filter(k=>k.t<=recv+1e-9):null;
+  if(cp&&(!cpath.length||cpath[cpath.length-1].t<recv))cpath.push({t:recv,...interp(script,recv),lin:true});
+  let cx=0,cy=0,go=false,aim=null,stepped=false,hd=0,floor=RUNON;
+
+  const st=defs.map(d=>({d,x:d.x,y:d.y,x0:d.x,y0:d.y,on:0,bound:!!d.bound||!!d.post})).sort((a,b)=>a.x0-b.x0);
+  const mv=st.filter(s=>!s.bound);
+  if(live)defs.forEach(d=>{if(!d.bound&&!d.post)d.path=[{t:0,x:d.x,y:d.y}];});
+
+  const where=(a,t)=>(a===cp&&go)?{x:cx,y:cy}:(a===cp?interp(script,t):posAt(a,t));
+
+  for(let t=dt;t<dur+1e-6;t+=dt){
+    if(cp&&t>recv){
+      if(!go){const s0=interp(script,recv),sb=interp(script,recv-.25);cx=s0.x;cy=s0.y;go=true;
+        hd=Math.atan2(s0.x-sb.x,Math.max(.05,s0.y-sb.y));hd=Math.max(-MAXHEAD*1.6,Math.min(MAXHEAD*1.6,hd));
+        floor=Math.max(RUNON,Math.min(RUNMAX*1.1,Math.hypot(s0.x-sb.x,s0.y-sb.y)/.25*.92));}
+      const a=interp(script,t-dt),b=interp(script,t);
+      let sp=Math.hypot(b.x-a.x,b.y-a.y)/dt;
+      if(sp<floor)sp=floor;
+      const ref=interp(script,Math.min(t,script[script.length-1].t));
+      // Pick the hole ONCE, in the first stride after the catch, then commit to it.
+      if(aim===null){
+        let bx=cx,bs=-1e9;
+        for(let k=-5;k<=5;k++){
+          const tx=cx+k;
+          if(tx<2||tx>W-2||Math.abs(tx-ref.x)>AIMCAP)continue;
+          let m=99;
+          st.forEach(s=>{
+            if(s.y<cy-1||s.y>cy+14)return;
+            const d=Math.hypot(s.x-tx,(s.y-cy)*.6);
+            if(d<m)m=d;
+          });
+          const sc=Math.min(m,9)-.5*Math.abs(tx-ref.x);
+          if(sc>bs){bs=sc;bx=tx;}
+        }
+        aim=bx;
+      }
+      // One sidestep allowed: if a defender has closed the hole as he reaches the line, step off him.
+      if(!stepped){
+        const blocker=st.find(s=>s.y>cy&&s.y<cy+3.2&&Math.abs(s.x-aim)<1.1);
+        if(blocker){
+          const left=aim-1.8,right=aim+1.8;
+          const room=x=>{let m=99;st.forEach(s=>{if(s.y<cy-1||s.y>cy+6)return;m=Math.min(m,Math.hypot(s.x-x,(s.y-cy)*.6));});return m;};
+          aim=room(left)>room(right)?left:right;
+          aim=Math.max(ref.x-AIMCAP-1.8,Math.min(ref.x+AIMCAP+1.8,aim));
+          stepped=true;
+        }
+      }
+      // Heading is capped so he is always running forward, never across.
+      let close=99;
+      st.forEach(s=>{const d=Math.hypot(s.x-cx,s.y-cy);if(d<close)close=d;});
+      if(close<1.1)sp*=.7;                        // in contact: driving, not stopped
+      const wantHd=Math.max(-MAXHEAD,Math.min(MAXHEAD,Math.atan2(aim-cx,3)));
+      const dh=wantHd-hd,rate=TURNRATE*dt;
+      hd+=Math.sign(dh)*Math.min(Math.abs(dh),rate);
+      cx+=sp*dt*Math.sin(hd);
+      cy+=sp*dt*Math.cos(hd);
+      cx=Math.max(2,Math.min(W-2,cx));cy=Math.min(D-2,cy);
+      cpath.push({t:+t.toFixed(3),x:cx,y:cy});
+    }
+    if(!live)continue;
+    const b=ballFor(play,byId,acts,t,where),h=holderAt(play,acts,t);
+    mv.forEach(s=>{
+      let want=null,bs=1e9,near=1e9;
+      atks.forEach(a=>{
+        const q=where(a,t),dd=Math.hypot(q.x-s.x,q.y-s.y);
+        if(dd<near)near=dd;
+        if(q.y>s.y+1)return;
+        const dx=Math.abs(q.x-s.x);
+        if(dx>reach)return;
+        let sc=dx+.4*Math.abs(q.y-s.y);
+        if(h&&a.id===h)sc-=1.8;
+        if(sc<bs){bs=sc;want=q.x;}
+      });
+      if(near<2.8)s.on=1;                    // committed to a runner — decoy or not
+      let sp=s.on?lat*.25:lat;
+      if(play.press){
+        // pressing: no lateral movement until we have met them, then drift out with the ball
+        if(near>2.6)want=null;else{want=b?b.x:want;sp=lat;}
+      }
+      if(b&&b.y>s.y){want=b.x;sp=Math.min(sp,lat*.45);}
+      if(want!==null&&sp>0){
+        const tx=Math.max(s.x0-slide,Math.min(s.x0+slide,want)),dx=tx-s.x;
+        s.x+=Math.sign(dx)*Math.min(Math.abs(dx),sp*dt);
+      }
+      s.near=near;
+    });
+    for(let i=1;i<mv.length;i++)
+      if(mv[i].x<mv[i-1].x+gap)mv[i].x=Math.min(mv[i].x0+slide,mv[i-1].x+gap);
+    for(let i=mv.length-2;i>=0;i--)
+      if(mv[i+1].x<mv[i].x+gap)mv[i].x=Math.max(mv[i].x0-slide,mv[i+1].x-gap);
+    mv.forEach(s=>{
+      if(fwd>0&&!s.on&&s.near>2.4&&b&&b.y<s.y-.5&&s.y0-s.y<maxUp)s.y-=fwd*dt;
+      if(cp&&go){
+        const dxx=s.x-cx,dyy=s.y-cy,r=Math.hypot(dxx,dyy);
+        if(r<1.5&&r>1e-3){
+          s.x+=dxx/r*(1.7-r);s.y+=dyy/r*(1.7-r);
+        }
+      }
+      s.d.path.push({t:+t.toFixed(3),x:s.x,y:s.y});
+    });
+  }
+  if(cp&&cpath.length>1)cp.path=cpath;
+}
+function compile(play){
+  const players=(play.players||[]).map(p=>({...p,path:[{t:0,x:p.x,y:p.y}]}));
+  const byId={};players.forEach(p=>byId[p.id]=p);
+  const acts=(play.actions||[]).slice().sort((a,b)=>a.t-b.t);
+  let end=0;
+  acts.forEach(a=>{end=Math.max(end,a.t+(a.d||0));});
+  normaliseRuns(play,byId).forEach(a=>{
+    const p=byId[a.who];if(!p)return;
+    p.bound=false;p.small=false;p.scriptedPost=!!p.post;
+    const last=p.path[p.path.length-1];
+    if(a.t>last.t)p.path.push({t:a.t,x:last.x,y:last.y});
+    const dx=a.dx||0,dy=a.dy||0,dist=Math.hypot(dx,dy);
+    const ang=Math.abs(Math.atan2(dx,dy));
+    if(dist>=7&&dy>=1.5&&ang>55*Math.PI/180&&!a.straight){
+      // long cross-field run: across first while behind play, then straighten and ACCELERATE into the line
+      const l1=Math.hypot(dx*.85,dy*.3),l2=Math.hypot(dx*.15,dy*.7);
+      const f1=l1/(l1+l2);
+      p.path.push({t:a.t+a.d*f1,x:last.x+dx*.85,y:last.y+dy*.3});
+    }
+    p.path.push({t:a.t+a.d,x:last.x+dx,y:last.y+dy});
+  });
+  players.forEach(p=>p.path.sort((a,b)=>a.t-b.t));
+  const dur=Math.max(1.2,end+.6);
+  (play.actions||[]).forEach(a=>{if(a.hold&&byId[a.who])byId[a.who].hold=true;});
+  const CREEP=1.6;
+  const S=play.weDefend?'def':'atk';
+  const moving=p=>p.team===S&&!p.bound&&!p.post&&!p.hold&&!play.type;
+  players.forEach(p=>{
+    if(p.team!==S||p.bound||p.post||play.type||play.cat==='Lineout')return;
+    const k=p.path;
+    // start deeper and walk onto the ball instead of standing on a spot
+    const passesFirst=acts.some(e=>e.type==='pass'&&e.from===p.id&&e.t<(k[1]?k[1].t:0)+1e-9);
+    if(k.length>=2&&!passesFirst&&k[0].x===k[1].x&&k[0].y===k[1].y){
+      const back=Math.min(3,CREEP*(k[1].t-k[0].t));
+      k[0]={t:0,x:k[0].x,y:k[0].y-back};
+    }
+    for(let i=1;i<k.length-1;i++){
+      if(k[i].x===k[i+1].x&&k[i].y===k[i+1].y){
+        const g=k[i+1].t-k[i].t;
+        const later=acts.some(e=>e.type==='pass'&&((e.from===p.id&&e.t>=k[i].t-1e-9)||(e.to===p.id&&e.t+e.d>=k[i].t-1e-9)));
+        const sp=Math.max(.001,k[i].t-k[i-1].t);
+        let vx=(k[i].x-k[i-1].x)/sp,vy=(k[i].y-k[i-1].y)/sp;
+        if(!later&&Math.hypot(vx,vy)>1){
+          // free of the ball: carry on at 60% through the gap, everything after shifts with him
+          const f=Math.min(.6*g,6/Math.max(.001,Math.hypot(vx,vy)));
+          const ox=vx*f,oy=vy*f;
+          for(let j=i+1;j<k.length;j++){k[j]={t:k[j].t,x:k[j].x+ox,y:k[j].y+oy};}
+        }else{
+          const back=Math.min(2,CREEP*g);
+          k[i]={t:k[i].t,x:k[i].x,y:k[i].y-back};
+        }
+      }
+    }
+    if(k.length===1)k.push({t:dur,x:k[0].x,y:Math.min(D-2,k[0].y+Math.min(6,CREEP*dur))});
+  });
+  // after his last job a player keeps running in support, he does not freeze
+  players.forEach(p=>{
+    if(!moving(p))return;
+    const k=p.path;if(k.length<2)return;
+    const b=k[k.length-1],a=k[k.length-2];
+    if(b.t>=dur-.05)return;
+    const sp=Math.max(.001,b.t-a.t);
+    let vx=(b.x-a.x)/sp*.85,vy=(b.y-a.y)/sp*.85;
+    if(vy<1.2)vy=1.2;
+    const g=dur-b.t;
+    k.push({t:dur,x:Math.max(1.5,Math.min(W-1.5,b.x+vx*g)),y:Math.max(1.5,Math.min(D-1.5,b.y+vy*g))});
+  });
+  if(acts.length)simulate(play,players,byId,dur,acts);
+  const steps=(play.actions||[]).filter(a=>a.note).sort((a,b)=>a.t-b.t);
+  return {play,players,byId,dur,steps,acts};
+}
+/* Keyframes are joined with a smooth curve, not straight segments —
+   a running line bends, it does not turn corners. */
+function interp(path,t){
+  const n=path.length;
+  if(n===1||t<=path[0].t)return path[0];
+  if(t>=path[n-1].t)return path[n-1];
+  let i=1;while(path[i].t<t)i++;
+  const p1=path[i-1],p2=path[i],h=p2.t-p1.t;
+  if(h<=1e-6)return p2;
+  if(Math.abs(p2.x-p1.x)<1e-9&&Math.abs(p2.y-p1.y)<1e-9)return p1;   // standing still
+  const u=(t-p1.t)/h;
+  if(h<.1||p2.lin||p1.lin){return {x:p1.x+(p2.x-p1.x)*u,y:p1.y+(p2.y-p1.y)*u};}   // dense simulated path
+  const p0=path[i-2]||p1,p3=path[i+1]||p2;
+  const vel=(a,b)=>{const d=b.t-a.t;return d>1e-6?{x:(b.x-a.x)/d,y:(b.y-a.y)/d}:{x:0,y:0};};
+  const v1=vel(p0,p2),v2=vel(p1,p3);
+  const H=w=>{const w2=w*w,w3=w2*w;
+    const h00=2*w3-3*w2+1,h10=w3-2*w2+w,h01=-2*w3+3*w2,h11=w3-w2;
+    return {x:h00*p1.x+h10*v1.x*h+h01*p2.x+h11*v2.x*h,
+            y:h00*p1.y+h10*v1.y*h+h01*p2.y+h11*v2.y*h};};
+  // re-time along the curve so speed is constant within the segment
+  const M=14,L=[0];let prev=H(0);
+  for(let k=1;k<=M;k++){const q=H(k/M);L.push(L[k-1]+Math.hypot(q.x-prev.x,q.y-prev.y));prev=q;}
+  const target=u*L[M];
+  let k=1;while(k<M&&L[k]<target)k++;
+  const seg=L[k]-L[k-1],f=seg>1e-9?(target-L[k-1])/seg:0;
+  return H((k-1+f)/M);
+}
+function posAt(p,t){const q=interp(p.path,t);return {x:Math.max(.8,Math.min(W-.8,q.x)),y:Math.max(.8,Math.min(D-.8,q.y))};}
+function ballFor(play,byId,acts,t,where){
+  if(!play.ballStart)return null;
+  let holder=play.ballStart;
+  const at=where||((a,tt)=>posAt(a,tt));
+  const evs=acts.filter(a=>a.type==='pass'||a.type==='kick');
+  for(const e of evs){
+    if(t<e.t)break;
+    const src=byId[e.from];
+    const from=src?at(src,e.t):{x:0,y:0};
+    if(t<e.t+e.d){
+      const dst=e.type==='kick'?e.to:at(byId[e.to],e.t+e.d);
+      const u=(t-e.t)/e.d;
+      return {x:from.x+(dst.x-from.x)*u,y:from.y+(dst.y-from.y)*u,
+              r:e.type==='kick'?(e.low?.95+Math.sin(Math.PI*u*3)*.2:1.1+Math.sin(Math.PI*u)*1.3):.9};
+    }
+    if(e.type==='kick')return {x:e.to.x,y:e.to.y,r:.9,dead:true};
+    holder=e.to;
+  }
+  const h=byId[holder];if(!h)return null;
+  const p=at(h,t);
+  return {x:p.x+1.1,y:p.y-.4,r:.85};
+}
+function ballAt(C,t){return ballFor(C.play,C.byId,C.acts,t);}
+
+/* ---------- rendering ---------- */
+function pitchSVG(play){
+  const svg=el('svg',{class:'pitch',viewBox:`0 0 ${W*PX} ${D*PX}`,preserveAspectRatio:'xMidYMid meet'});
+  const g=el('g');svg.appendChild(g);
+  for(let y=0;y<=D;y+=5){
+    g.appendChild(el('line',{x1:0,y1:sy(y),x2:sx(W),y2:sy(y),
+      stroke:'rgba(255,255,255,.09)','stroke-width':2}));
+  }
+  [5,15,W-15,W-5].forEach(x=>g.appendChild(el('line',{x1:sx(x),y1:0,x2:sx(x),y2:sy(0),
+    stroke:'rgba(255,255,255,.14)','stroke-width':2,'stroke-dasharray':'4 12'})));
+  if(play.tryline!==undefined)
+    g.appendChild(el('line',{x1:0,y1:sy(play.tryline),x2:sx(W),y2:sy(play.tryline),
+      stroke:'rgba(255,255,255,.75)','stroke-width':5}));
+  if(play.halfway!==undefined)
+    g.appendChild(el('line',{x1:0,y1:sy(play.halfway),x2:sx(W),y2:sy(play.halfway),
+      stroke:'rgba(255,255,255,.55)','stroke-width':4}));
+  if(play.cat==='Lineout'){
+    g.appendChild(el('line',{x1:sx(4),y1:0,x2:sx(4),y2:sy(0),stroke:'rgba(255,255,255,.8)','stroke-width':5}));
+    g.appendChild(el('line',{x1:sx(9),y1:0,x2:sx(9),y2:sy(0),stroke:'rgba(255,255,255,.2)','stroke-width':2,'stroke-dasharray':'5 9'}));
+    g.appendChild(el('line',{x1:sx(19),y1:0,x2:sx(19),y2:sy(0),stroke:'rgba(255,255,255,.2)','stroke-width':2,'stroke-dasharray':'5 9'}));
+  }
+  const arrow=el('g',{opacity:.5});
+  arrow.appendChild(el('line',{x1:sx(W-3),y1:sy(2),x2:sx(W-3),y2:sy(7),stroke:'#F5A524','stroke-width':3}));
+  arrow.appendChild(el('polygon',{points:`${sx(W-3)},${sy(8.5)} ${sx(W-4)},${sy(6.5)} ${sx(W-2)},${sy(6.5)}`,fill:'#F5A524'}));
+  g.appendChild(arrow);
+  return svg;
+}
+
+let C=null,T=0,playing=false,rate=1,raf=null,last=0,current=null;
+
+function renderStage(play){
+  const stage=document.getElementById('stage');
+  stage.innerHTML='';
+  current=play;
+  if(play.type==='info'){
+    const d=document.createElement('div');d.className='info';d.innerHTML=play.html;
+    stage.appendChild(d);C=null;return;
+  }
+  const board=document.createElement('div');board.className='board';
+  const svg=pitchSVG(play);
+  const layer=el('g',{id:'layer'});svg.appendChild(layer);
+  board.appendChild(svg);stage.appendChild(board);
+  C=compile(play);T=0;buildNodes(C);
+  if(play.type==='formation'){
+    draw(0);
+    if(play.html){const d=document.createElement('div');d.className='info';
+      d.style.marginTop='12px';d.innerHTML=play.html;stage.appendChild(d);}
+    return;
+  }
+  const tr=document.createElement('div');tr.className='transport';
+  tr.innerHTML=`<button id="rew" aria-label="Restart">&#9198;</button>
+    <button id="pp" class="main" aria-label="Play">&#9654;</button>
+    <input id="scrub" type="range" min="0" max="1000" value="0" aria-label="Timeline">
+    <button id="spd" class="spd">1&times;</button>`;
+  stage.appendChild(tr);
+  tr.querySelector('#rew').onclick=()=>{T=0;draw(T);setPlaying(true);};
+  tr.querySelector('#pp').onclick=()=>setPlaying(!playing);
+  tr.querySelector('#spd').onclick=e=>{rate=rate===1?.5:rate===.5?.25:1;
+    e.currentTarget.innerHTML=(rate===1?'1':rate===.5?'&frac12;':'&frac14;')+'&times;';};
+  tr.querySelector('#scrub').oninput=e=>{setPlaying(false);T=e.target.value/1000*C.dur;draw(T);};
+  draw(0);
+  const reduce=!!(window.matchMedia&&window.matchMedia('(prefers-reduced-motion: reduce)').matches);
+  if(!reduce)setPlaying(true);
+}
+
+function setPlaying(v){
+  playing=v;
+  const b=document.getElementById('pp');
+  if(b)b.innerHTML=v?'&#10073;&#10073;':'&#9654;';
+  if(v){last=performance.now();if(!raf)raf=requestAnimationFrame(tick);}
+}
+function tick(now){
+  raf=null;
+  if(playing&&C){
+    T+=(now-last)/1000*rate;last=now;
+    if(T>=C.dur){T=C.dur;setPlaying(false);}
+    draw(T);
+  }
+  if(playing)raf=requestAnimationFrame(tick);
+}
+
+/* Nodes are built once per play and only their attributes change each frame —
+   rebuilding the whole layer every frame is what made the motion stutter. */
+function buildNodes(C){
+  const layer=document.getElementById('layer');
+  if(!layer)return;
+  while(layer.firstChild)layer.removeChild(layer.firstChild);
+  const N={trails:[],marks:[],dummies:[],players:[],ballTrail:null,ball:null,misses:[],decoyTags:[]};
+  const {players,play}=C;
+  const decoyOf={};C.acts.forEach(a=>{if(a.type==='run'&&a.decoy)decoyOf[a.who]=a;});
+  players.forEach(p=>{
+    if(p.team!=='atk'||p.path.length<2)return;
+    const isDecoy=!!decoyOf[p.id];
+    const e=el('path',{fill:'none',stroke:isDecoy?'#F5A524':'#5FD3F3','stroke-width':isDecoy?2.2:2.5,
+      'stroke-dasharray':isDecoy?'7 5':'1 6',opacity:isDecoy?.6:.75,'stroke-linecap':'round'});
+    layer.appendChild(e);N.trails.push({p,e});
+  });
+  Object.keys(decoyOf).forEach(id=>{
+    const tx=el('text',{'text-anchor':'middle',fill:'#F5A524','font-size':8.5,'font-weight':800,
+      'letter-spacing':'1.2','font-family':'ui-sans-serif,system-ui',opacity:0});
+    tx.textContent='DECOY';layer.appendChild(tx);N.decoyTags.push({p:C.byId[id],a:decoyOf[id],tx});
+  });
+  C.acts.forEach(a=>{
+    if(a.type!=='pass'||!a.miss)return;
+    const g=el('g',{opacity:0});
+    g.appendChild(el('line',{stroke:'#F5A524','stroke-width':2.5,'stroke-linecap':'round'}));
+    g.appendChild(el('polygon',{fill:'#F5A524'}));
+    const tx=el('text',{'text-anchor':'middle',fill:'#F5A524','font-size':8.5,'font-weight':800,
+      'letter-spacing':'1.2','font-family':'ui-sans-serif,system-ui'});
+    tx.textContent='MISS';g.appendChild(tx);
+    layer.appendChild(g);N.misses.push({a,g});
+  });
+  C.acts.forEach(a=>{
+    if(a.type!=='mark')return;
+    const g=el('g',{opacity:0});
+    g.appendChild(el('circle',{cx:sx(a.x),cy:sy(a.y),r:13,fill:'none',
+      stroke:'rgba(255,255,255,.35)','stroke-width':3,'stroke-dasharray':'3 5'}));
+    const tx=el('text',{x:sx(a.x),y:sy(a.y)+4,'text-anchor':'middle',
+      fill:'rgba(255,255,255,.5)','font-size':11,'font-weight':700,
+      'font-family':'ui-sans-serif,system-ui'});
+    tx.textContent=a.label||'';g.appendChild(tx);
+    layer.appendChild(g);N.marks.push({a,g});
+  });
+  if(play.ballStart){
+    N.ballTrail=el('path',{fill:'none',stroke:'#F5A524','stroke-width':3,opacity:.85,
+      'stroke-linecap':'round','stroke-linejoin':'round'});
+    layer.appendChild(N.ballTrail);
+  }
+  C.acts.forEach(a=>{
+    if(a.type!=='dummy')return;
+    const e=el('line',{stroke:'#F5A524','stroke-width':2.5,'stroke-dasharray':'2 7',opacity:0});
+    layer.appendChild(e);N.dummies.push({a,e});
+  });
+  players.forEach(p=>{
+    const g=el('g'),atk=p.team==='atk',set=p.team==='ruck'||p.team==='scrum';
+    let ring=null;
+    if(p.team==='ring'){
+      g.appendChild(el('ellipse',{rx:38,ry:34,fill:'rgba(255,255,255,.04)',
+        stroke:'rgba(255,255,255,.3)','stroke-width':2.5,'stroke-dasharray':'5 6'}));
+      layer.appendChild(g);N.players.push({p,g,ring:null});return;
+    }
+    if(set){
+      g.appendChild(el('circle',{r:p.r||15,fill:'rgba(255,255,255,.06)',
+        stroke:'rgba(255,255,255,.35)','stroke-width':2.5,
+        'stroke-dasharray':p.team==='ruck'?'4 5':''}));
+      const t2=el('text',{y:p.r?-(p.r+5):4,'text-anchor':'middle',fill:'rgba(255,255,255,.55)',
+        'font-size':9,'font-weight':800,'font-family':'ui-sans-serif,system-ui'});
+      t2.textContent=p.team==='ruck'?'RUCK':'SCRUM';g.appendChild(t2);
+    }else{
+      if(C.acts.some(a=>a.type==='lift'&&a.who===p.id)){
+        ring=el('circle',{r:13,fill:'none',stroke:'#F5A524','stroke-width':2.5,opacity:0});
+        g.appendChild(ring);
+      }
+      const R=p.small?9:12;
+      g.appendChild(el('circle',{r:R,fill:atk?'#EAF7FF':'#8E2438',
+        stroke:atk?'#5FD3F3':'#E86B7F','stroke-width':p.small?2:2.5}));
+      const t2=el('text',{y:p.small?3.5:4.5,'text-anchor':'middle',fill:atk?'#0A1620':'#FFE8EC',
+        'font-size':p.small?8.5:(p.label.length>2?9.5:12),'font-weight':800,
+        'font-family':'ui-sans-serif,system-ui'});
+      t2.textContent=p.label;g.appendChild(t2);
+    }
+    layer.appendChild(g);N.players.push({p,g,ring});
+  });
+  if(play.ballStart){
+    N.ball=el('circle',{fill:'#F5A524',stroke:'#0A1620','stroke-width':2,r:5});
+    layer.appendChild(N.ball);
+  }
+  C.nodes=N;
+}
+
+function draw(t){
+  if(!C||!C.nodes)return;
+  const N=C.nodes,play=C.play;
+  N.trails.forEach(({p,e})=>{
+    let d='';
+    for(let s=0;s<=70;s++){
+      const q=posAt(p,t*s/70);
+      d+=(s?'L':'M')+sx(q.x).toFixed(1)+' '+sy(q.y).toFixed(1)+' ';
+    }
+    e.setAttribute('d',d);
+  });
+  N.marks.forEach(({a,g})=>g.setAttribute('opacity',t>=a.t?1:0));
+  if(N.ballTrail){
+    let d='',started=false;
+    for(let s=0;s<=60;s++){
+      const b=ballAt(C,t*s/60);if(!b)continue;
+      d+=(started?'L':'M')+sx(b.x).toFixed(1)+' '+sy(b.y).toFixed(1)+' ';started=true;
+    }
+    N.ballTrail.setAttribute('d',d);
+  }
+  N.decoyTags.forEach(({p,a,tx})=>{
+    const on=t>=a.t-.1&&t<=a.t+a.d+.6;
+    tx.setAttribute('opacity',on?.9:0);
+    if(on){const q=posAt(p,t);tx.setAttribute('x',sx(q.x));tx.setAttribute('y',sy(q.y)-17);}
+  });
+  N.misses.forEach(({a,g})=>{
+    const on=t>=a.t;
+    g.setAttribute('opacity',on?.85:0);
+    if(on){
+      const f=posAt(C.byId[a.from],a.t),r=posAt(C.byId[a.to],a.t+a.d);
+      const x1=sx(f.x),y1=sy(f.y),x2=sx(r.x),y2=sy(r.y);
+      const L=Math.hypot(x2-x1,y2-y1)||1,ux=(x2-x1)/L,uy=(y2-y1)/L;
+      const ex=x2-ux*14,ey=y2-uy*14;                      // stop short of the receiver
+      g.children[0].setAttribute('x1',x1);g.children[0].setAttribute('y1',y1);
+      g.children[0].setAttribute('x2',ex);g.children[0].setAttribute('y2',ey);
+      const px=-uy,py=ux;
+      g.children[1].setAttribute('points',(ex+ux*9)+','+(ey+uy*9)+' '+(ex+px*5)+','+(ey+py*5)+' '+(ex-px*5)+','+(ey-py*5));
+      g.children[2].setAttribute('x',(x1+x2)/2+px*11);g.children[2].setAttribute('y',(y1+y2)/2+py*11+3);
+    }
+  });
+  N.dummies.forEach(({a,e})=>{
+    const on=t>=a.t&&t<=a.t+a.d+.25;
+    e.setAttribute('opacity',on?.75:0);
+    if(on){
+      const f=posAt(C.byId[a.from],t),g2=posAt(C.byId[a.to],t);
+      e.setAttribute('x1',sx(f.x));e.setAttribute('y1',sy(f.y));
+      e.setAttribute('x2',sx(g2.x));e.setAttribute('y2',sy(g2.y));
+    }
+  });
+  N.players.forEach(({p,g,ring})=>{
+    const q=posAt(p,t);
+    g.setAttribute('transform','translate('+sx(q.x).toFixed(1)+' '+sy(q.y).toFixed(1)+')');
+    if(ring){
+      const a=C.acts.find(x=>x.type==='lift'&&x.who===p.id&&t>=x.t&&t<=x.t+x.d+.3);
+      if(a){const u=Math.min(1,(t-a.t)/(a.d+.3));
+        ring.setAttribute('r',13+u*13);ring.setAttribute('opacity',1-u);}
+      else ring.setAttribute('opacity',0);
+    }
+  });
+  if(N.ball){
+    const b=ballAt(C,t);
+    if(b){N.ball.setAttribute('opacity',1);
+      N.ball.setAttribute('cx',sx(b.x));N.ball.setAttribute('cy',sy(b.y));
+      N.ball.setAttribute('r',(b.r*PX*.62).toFixed(1));}
+    else N.ball.setAttribute('opacity',0);
+  }
+  const sc=document.getElementById('scrub');
+  if(sc)sc.value=Math.round(t/C.dur*1000);
+  const lis=document.querySelectorAll('#steps li');
+  C.steps.forEach((s,i)=>{
+    if(!lis[i])return;
+    lis[i].classList.toggle('on',t>=s.t-.05&&t<=s.t+(s.d||0)+.5);
+  });
+}
+
+/* ---------- UI ---------- */
+const cats=[...new Set(PLAYS.map(p=>p.cat))];
+let activeCat=cats[0];
+const catBar=document.getElementById('cats'),chipBar=document.getElementById('plays');
+
+function buildCats(){
+  catBar.innerHTML='';
+  cats.forEach(c=>{
+    const b=document.createElement('button');b.textContent=c;
+    b.setAttribute('aria-selected',c===activeCat);
+    b.onclick=()=>{activeCat=c;buildCats();buildChips();select(PLAYS.find(p=>p.cat===c));};
+    catBar.appendChild(b);
+  });
+}
+function buildChips(){
+  chipBar.innerHTML='';
+  PLAYS.filter(p=>p.cat===activeCat).forEach(p=>{
+    const b=document.createElement('button');b.textContent=p.name;b.dataset.id=p.id;
+    b.onclick=()=>select(p);chipBar.appendChild(b);
+  });
+}
+function select(p){
+  if(!p)return;
+  document.querySelectorAll('#plays button').forEach(b=>
+    b.setAttribute('aria-selected',b.dataset.id===p.id));
+  setPlaying(false);
+  document.getElementById('pname').innerHTML=p.name.replace(/^(\w)/,'<em>$1</em>');
+  document.getElementById('pblurb').textContent=p.blurb||'';
+  const ol=document.getElementById('steps');ol.innerHTML='';
+  const note=document.getElementById('pnote');note.innerHTML='';
+  const stepsFor=(p.actions||[]).filter(a=>a.note).sort((a,b)=>a.t-b.t);
+  stepsFor.forEach(s=>{
+    const li=document.createElement('li');li.textContent=s.note;
+    li.onclick=()=>{setPlaying(false);T=s.t;draw(T);};
+    ol.appendChild(li);
+  });
+  if(p.check){const d=document.createElement('div');d.className='callout';
+    d.textContent=p.check;note.appendChild(d);}
+  renderStage(p);
+  document.getElementById('legend').innerHTML=(p.type==='info')?'':
+    `<span><i style="background:#EAF7FF;border:2px solid #5FD3F3"></i>us</span>
+     <span><i style="background:#8E2438;border:2px solid #E86B7F"></i>them</span>
+     <span><i style="background:#F5A524"></i>ball</span>
+     <span><i style="background:none;border:2px dotted #5FD3F3"></i>running line</span>
+     <span><i style="background:none;border:2px dashed #F5A524"></i>decoy line</span>
+     <span><i style="background:none;border-top:2.5px solid #F5A524;height:0;border-radius:0"></i>miss pass</span>`;
+}
+buildCats();buildChips();select(PLAYS[0]);
+</script>
+</body>
+</html>

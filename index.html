@@ -67,6 +67,11 @@ ol.steps li.on:before{color:var(--amber)}
   padding:1px 5px;border-radius:4px;font-size:12px;color:var(--amber)}
 .info b{color:#fff}
 .zones{width:100%;height:auto;display:block;margin:0 0 14px;border-radius:10px}
+.dl{display:flex;gap:8px;margin:0 0 14px}
+.dl a{flex:1;text-align:center;padding:11px 10px;border-radius:9px;background:var(--amber);color:#0A1620;
+  font-weight:800;letter-spacing:.06em;text-decoration:none;font-size:13px}
+.pages{display:flex;flex-direction:column;gap:10px}
+.pbpage{width:100%;height:auto;display:block;border-radius:8px;background:#fff;border:1px solid var(--line)}
 footer{padding:26px 16px 0;font-size:11px;color:var(--muted);line-height:1.6}
 @media (min-width:820px){main{max-width:820px;margin:0 auto}header,nav,.chips{max-width:820px;margin:0 auto}}
 </style>
@@ -141,6 +146,12 @@ const LINEOUT=(toks)=>{
 
 /* ---------- play data ---------- */
 const PLAYS=[
+
+/* ============ PLAYBOOK ============ */
+{cat:'Playbook',id:'thebook',name:'The written playbook',type:'info',blurb:'The coach\'s playbook as written. Everything in the animator is drawn from this.',
+ html:`<div class="dl"><a href="playbook/Paisley-RFC-Playbook-2026-27.pdf" download>&#8681; PDF</a><a href="playbook/Paisley-RFC-Playbook-2026-27.docx" download>&#8681; Word</a></div>
+ <div class="pages"><img class="pbpage" src="playbook/pages/page-01.png" alt="Playbook page 1" loading="lazy"><img class="pbpage" src="playbook/pages/page-02.png" alt="Playbook page 2" loading="lazy"><img class="pbpage" src="playbook/pages/page-03.png" alt="Playbook page 3" loading="lazy"><img class="pbpage" src="playbook/pages/page-04.png" alt="Playbook page 4" loading="lazy"><img class="pbpage" src="playbook/pages/page-05.png" alt="Playbook page 5" loading="lazy"><img class="pbpage" src="playbook/pages/page-06.png" alt="Playbook page 6" loading="lazy"><img class="pbpage" src="playbook/pages/page-07.png" alt="Playbook page 7" loading="lazy"><img class="pbpage" src="playbook/pages/page-08.png" alt="Playbook page 8" loading="lazy"><img class="pbpage" src="playbook/pages/page-09.png" alt="Playbook page 9" loading="lazy"><img class="pbpage" src="playbook/pages/page-10.png" alt="Playbook page 10" loading="lazy"><img class="pbpage" src="playbook/pages/page-11.png" alt="Playbook page 11" loading="lazy"><img class="pbpage" src="playbook/pages/page-12.png" alt="Playbook page 12" loading="lazy"><img class="pbpage" src="playbook/pages/page-13.png" alt="Playbook page 13" loading="lazy"></div>
+ <p style="margin-top:12px">Where the animator and the book disagree, the book wins — tell the coach, and tell whoever is editing the animator.</p>`},
 
 /* ============ GAME PLAN ============ */
 {cat:'Game plan',id:'zones',name:'Attack zones',type:'info',blurb:'Where you are on the park decides what you do next.',
@@ -1513,6 +1524,7 @@ function draw(t){
 
 /* ---------- UI ---------- */
 const cats=[...new Set(PLAYS.map(p=>p.cat))];
+const gpi=cats.indexOf('Game plan');if(gpi>0){cats.splice(gpi,1);cats.unshift('Game plan');}
 let activeCat=cats[0];
 const catBar=document.getElementById('cats'),chipBar=document.getElementById('plays');
 

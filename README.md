@@ -13,6 +13,7 @@ Pick a section, pick a call, and it runs. Scrub the timeline, slow it to ½ or �
 | Section | Contents |
 |---|---|
 | Game plan | Attack zones (red / amber / green), Arrowheads, ABCD at the ruck, kick calls & comms |
+| Playbook | The written playbook, page by page, with PDF and Word downloads |
 | Forwards | Punch, Jab, Escape (both versions), Reload, 10 call, Chaos, Ronnie Ball |
 | Back row | Yellow, Black 1, Black 2 — full 8 v 8 scrums |
 | Backs | Polo, Munster, Spencer, Strike, Exeter, Munster Wedge, Wiper, Wedge, Frank, Carter, Stevie, Accies, Wasps, Bath, Back Door, 10 call |
@@ -43,4 +44,4 @@ Everything is in `index.html`. Each play is one object in the `PLAYS` array: a l
 
 ## Source
 
-`playbook/` holds the written playbook as given (Word and PDF). The animator is an interpretation of it, not a replacement for it.
+`playbook/` holds the written playbook as given (Word and PDF) and the page images shown in the Playbook tab. The animator is an interpretation of it, not a replacement for it — where they disagree, the book wins.
